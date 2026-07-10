@@ -1,0 +1,173 @@
+.sync-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sync-header {
+  margin-bottom: 32px;
+}
+
+.sync-header h1 {
+  font-size: 28px;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.sync-header p {
+  color: var(--text-muted);
+}
+
+.sync-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .sync-grid {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.table-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.table-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+}
+
+.table-name {
+  font-weight: 600;
+  color: var(--text-main);
+  font-size: 16px;
+}
+
+.table-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.stat-synced {
+  color: #10b981;
+}
+
+.stat-unsynced {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.pending-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pending-item {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.pending-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pending-type {
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.type-CREATE { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+.type-UPDATE { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+.type-DELETE { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+.pending-endpoint {
+  font-family: monospace;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pending-payload {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #a78bfa;
+  overflow-x: auto;
+  margin-bottom: 16px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.pending-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-retry, .btn-discard {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+}
+
+.btn-retry {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.btn-discard {
+  background: transparent;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+}
+
+.btn-retry:hover, .btn-discard:hover {
+  opacity: 0.8;
+}
+
+.doc-section {
+  padding: 24px;
+}
+
+.doc-section h3 {
+  color: var(--text-main);
+  margin-bottom: 16px;
+}
+
+.doc-item {
+  margin-bottom: 20px;
+}
+
+.doc-item h4 {
+  color: var(--accent-primary);
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.doc-item p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}

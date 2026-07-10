@@ -1,0 +1,221 @@
+/* ── DISEÑO BASE (Mobile First - Menú Deslizable) ── */
+
+/* Botón flotante estilo Glass para abrir el menú */
+.mobile-menu-toggle {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 12px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--card-shadow);
+}
+
+/* Fondo oscuro (overlay) cuando el menú está abierto */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 95;
+}
+
+/* Sidebar oculto por defecto a la izquierda */
+.sidebar-container {
+  position: fixed;
+  top: 0;
+  left: -320px; /* Fuera de la pantalla */
+  width: 280px;
+  height: 100vh;
+  margin: 0;
+  padding: 30px 20px;
+  border-radius: 0 24px 24px 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  box-sizing: border-box;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Ocultar barra de scroll para Chrome/Safari/Webkit */
+.sidebar-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Clase que se agrega desde React cuando abre el menú */
+.sidebar-container.open {
+  left: 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 30px;
+  color: var(--text-main);
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.logo-icon {
+  width: 40px; 
+  height: 40px; 
+  background: var(--accent-primary); 
+  border-radius: 12px; 
+  display: grid; 
+  place-items: center; 
+  color: white;
+}
+
+/* Links en móvil (Lista vertical amplia) */
+.sidebar-link, .sidebar-btn {
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.sidebar-link.active {
+  color: var(--accent-primary);
+  background: var(--accent-bg);
+}
+
+.sidebar-link:hover, .sidebar-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-label {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.mobile-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+}
+
+.tooltip-container {
+  position: relative;
+  width: 100%;
+}
+
+.tooltip-text {
+  display: none; 
+}
+
+
+/* ── DISEÑO DE ESCRITORIO (Sidebar Fijo Lateral) ── */
+@media (min-width: 768px) {
+  /* Ocultamos cosas exclusivas de móvil */
+  .mobile-menu-toggle, .sidebar-overlay, .mobile-close-btn, .sidebar-title-mobile {
+    display: none; 
+  }
+
+  .sidebar-container {
+    position: static; /* Ya no es fixed, fluye con el Layout */
+    width: 80px;
+    height: 95vh;
+    margin: 2.5vh 0 2.5vh 20px;
+    padding: 30px 0;
+    border-radius: 24px;
+    align-items: center;
+  }
+
+  .sidebar-nav {
+    align-items: center;
+    gap: 30px;
+  }
+
+  .sidebar-logo {
+    margin-bottom: 20px;
+  }
+
+  /* En escritorio volvemos a formato original (solo ícono central) */
+  .sidebar-link, .sidebar-btn {
+    justify-content: center;
+    padding: 8px;
+    background: transparent;
+  }
+
+  .sidebar-link.active {
+    background: transparent;
+  }
+
+  .sidebar-label {
+    display: none; /* Ocultamos el texto para dejar solo el ícono */
+  }
+
+  /* ── Tooltips para Escritorio ── */
+  .tooltip-text {
+    display: block;
+    position: absolute;
+    left: 100%;       
+    margin-left: 20px; 
+    padding: 6px 12px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(-10px);
+    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    z-index: 100;
+    pointer-events: none; 
+    box-shadow: var(--card-shadow);
+  }
+
+  .tooltip-text::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: transparent var(--glass-border) transparent transparent;
+  }
+
+  .tooltip-container:hover .tooltip-text {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+}

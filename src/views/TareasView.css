@@ -1,0 +1,250 @@
+/* Tareas.css */
+
+.kanban-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 20px;
+}
+
+.kanban-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ─── FORMULARIO RESPONSIVO ─── */
+.add-task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.add-task-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-main);
+  outline: none;
+  font-family: inherit;
+}
+
+.add-task-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.add-task-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-primary);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.add-task-btn:hover {
+  opacity: 0.9;
+}
+
+/* En Desktop el formulario se pone en fila */
+@media (min-width: 768px) {
+  .form-row {
+    flex-direction: row;
+  }
+  .add-task-form {
+    padding: 20px;
+  }
+}
+
+/* ─── KANBAN MOBILE FIRST ─── */
+.kanban-board {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+  min-height: 60vh;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 20px; /* Espacio para el scrollbar */
+}
+
+/* Las columnas ocupan casi toda la pantalla en móvil */
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(128, 128, 128, 0.05);
+  border-radius: 24px;
+  padding: 16px;
+  min-width: 85vw; 
+  flex-shrink: 0;
+  scroll-snap-align: center;
+  transition: background 0.3s ease;
+}
+
+.kanban-column.drag-over {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* En Desktop vuelve a ser Grid de 3 columnas */
+@media (min-width: 768px) {
+  .kanban-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    overflow-x: visible;
+  }
+  .kanban-column {
+    min-width: 0;
+  }
+}
+
+.kanban-column-title {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-main);
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+/* ─── TARJETAS ─── */
+.kanban-card {
+  cursor: grab;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+  transform: scale(0.98);
+}
+
+.kanban-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.kanban-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.kanban-card-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-main);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  color: var(--accent-primary);
+  background: var(--glass-border);
+}
+
+.kanban-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.badge-points {
+  background: var(--accent-primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* ─── MODAL DE EDICIÓN ─── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-cancel {
+  background: transparent;
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
+}
+
+.btn-cancel:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-main);
+}
