@@ -329,49 +329,49 @@ export function FoodTrackerView() {
             <h2>{formMode === 'edit' ? 'Editar Formulario Actual' : 'Configurar Perfil & Meta (Nuevo)'}</h2>
             
             <form onSubmit={handleSaveForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                   <label>Género</label>
-                  <select className="input-field" value={formValues.gender} onChange={e => setFormValues({...formValues, gender: e.target.value})}>
+                  <select className="glass-select" value={formValues.gender} onChange={e => setFormValues({...formValues, gender: e.target.value})}>
                     <option value="M">Hombre</option>
                     <option value="F">Mujer</option>
                   </select>
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                   <label>Edad</label>
-                  <input type="number" required className="input-field" value={formValues.edad} onChange={e => setFormValues({...formValues, edad: parseInt(e.target.value) || 0})} />
+                  <input type="number" required className="form-input" value={formValues.edad} onChange={e => setFormValues({...formValues, edad: parseInt(e.target.value) || 0})} />
                 </div>
               </div>
               
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                   <label>Peso (kg)</label>
-                  <input type="number" step="0.1" required className="input-field" value={formValues.peso} onChange={e => setFormValues({...formValues, peso: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="0.1" required className="form-input" value={formValues.peso} onChange={e => setFormValues({...formValues, peso: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                   <label>Altura (cm)</label>
-                  <input type="number" required className="input-field" value={formValues.altura} onChange={e => setFormValues({...formValues, altura: parseInt(e.target.value) || 0})} />
+                  <input type="number" required className="form-input" value={formValues.altura} onChange={e => setFormValues({...formValues, altura: parseInt(e.target.value) || 0})} />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
                   <label>Cuello (cm)</label>
-                  <input type="number" step="0.1" className="input-field" value={formValues.cuello} onChange={e => setFormValues({...formValues, cuello: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="0.1" className="form-input" value={formValues.cuello} onChange={e => setFormValues({...formValues, cuello: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
                   <label>Cintura (cm)</label>
-                  <input type="number" step="0.1" className="input-field" value={formValues.cintura} onChange={e => setFormValues({...formValues, cintura: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="0.1" className="form-input" value={formValues.cintura} onChange={e => setFormValues({...formValues, cintura: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1 }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
                   <label>Cadera (cm)</label>
-                  <input type="number" step="0.1" className="input-field" value={formValues.cadera} onChange={e => setFormValues({...formValues, cadera: parseFloat(e.target.value) || 0})} />
+                  <input type="number" step="0.1" className="form-input" value={formValues.cadera} onChange={e => setFormValues({...formValues, cadera: parseFloat(e.target.value) || 0})} />
                 </div>
               </div>
 
               <div className="form-group">
                 <label>Nivel de Actividad (1-Sedentario, 5-Muy Intenso)</label>
-                <select className="input-field" value={formValues.nivelActividad} onChange={e => setFormValues({...formValues, nivelActividad: parseInt(e.target.value)})}>
+                <select className="glass-select" value={formValues.nivelActividad} onChange={e => setFormValues({...formValues, nivelActividad: parseInt(e.target.value)})}>
                   <option value={1}>1 - Sedentario</option>
                   <option value={2}>2 - Ligero</option>
                   <option value={3}>3 - Moderado</option>
@@ -380,19 +380,19 @@ export function FoodTrackerView() {
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                   <label>Meta</label>
-                  <select className="input-field" value={formValues.meta} onChange={e => setFormValues({...formValues, meta: e.target.value})}>
+                  <select className="glass-select" value={formValues.meta} onChange={e => setFormValues({...formValues, meta: e.target.value})}>
                     <option value="bajar">Bajar de Peso</option>
                     <option value="mantener">Mantener</option>
                     <option value="subir">Subir de Peso</option>
                   </select>
                 </div>
                 {formValues.meta !== 'mantener' && (
-                  <div className="form-group" style={{ flex: 1 }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
                     <label>Velocidad (kg/sem)</label>
-                    <input type="number" step="0.1" className="input-field" value={formValues.velocidadKgSemana} onChange={e => setFormValues({...formValues, velocidadKgSemana: parseFloat(e.target.value) || 0})} />
+                    <input type="number" step="0.1" className="form-input" value={formValues.velocidadKgSemana} onChange={e => setFormValues({...formValues, velocidadKgSemana: parseFloat(e.target.value) || 0})} />
                   </div>
                 )}
               </div>

@@ -223,11 +223,11 @@ export function DashboardView() {
 
           {/* Análisis de Métricas */}
           <div className="glass-card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ color: 'var(--text-main)', margin: 0 }}>Análisis de Proyecto</h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h2 style={{ color: 'var(--text-main)', margin: 0, wordBreak: 'break-word' }}>Análisis de Proyecto</h2>
               <select 
                 className="glass-input" 
-                style={{ width: '250px', padding: '8px 12px' }}
+                style={{ width: '100%', maxWidth: '250px', padding: '8px 12px' }}
                 value={selectedProjectId} 
                 onChange={(e) => setSelectedProjectId(e.target.value ? Number(e.target.value) : '')}
               >
@@ -279,11 +279,12 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Columna Derecha (Widgets extra) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
           <div className="glass-card" style={{ background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)', color: 'white', padding: '24px' }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '20px' }}>{new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: 'clamp(16px, 4vw, 20px)', wordBreak: 'break-word', lineHeight: '1.4' }}>
+              {new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </h3>
             <p style={{ margin: 0, opacity: 0.9 }}>Estado: Local-First Activo</p>
           </div>
 

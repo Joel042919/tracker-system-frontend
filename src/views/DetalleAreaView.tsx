@@ -350,7 +350,7 @@ export function DetalleAreaView() {
                 <div className="item-meta">
                   <span>Puntos: {m.points}</span>
                 </div>
-                <div className="json-builder" style={{ fontSize: '12px', fontFamily: 'monospace' }}>
+                <div className="json-builder" style={{ fontSize: '12px', fontFamily: 'monospace', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
                   {typeof m.schema_esperado === 'string' ? m.schema_esperado : JSON.stringify(m.schema_esperado)}
                 </div>
                 <div className="item-footer">

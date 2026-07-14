@@ -122,7 +122,7 @@ export function PremiosView() {
                   required 
                   value={formValues.reward} 
                   onChange={e => setFormValues({...formValues, reward: e.target.value})}
-                  className="input-field"
+                  className="form-input"
                   placeholder="Ej. Salida al cine"
                 />
               </div>
@@ -134,7 +134,7 @@ export function PremiosView() {
                   min="1"
                   value={formValues.points_need} 
                   onChange={e => setFormValues({...formValues, points_need: parseInt(e.target.value) || 0})}
-                  className="input-field"
+                  className="form-input"
                 />
               </div>
               <div className="form-group">
@@ -143,7 +143,7 @@ export function PremiosView() {
                   rows={3}
                   value={formValues.description} 
                   onChange={e => setFormValues({...formValues, description: e.target.value})}
-                  className="input-field"
+                  className="form-textarea"
                   placeholder="Detalles del premio..."
                 />
               </div>
