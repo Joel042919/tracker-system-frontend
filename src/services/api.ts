@@ -51,10 +51,10 @@ async function apiFetch(url: string, options?: RequestInit) {
 }
 
 
-async function safeBulkReplace<T>(table: any, serverData: any[]): Promise<T[]> {
+async function safeBulkReplace<T>(table: any, serverData: any[], toLocalMapper?: (item: any) => any): Promise<T[]> {
   const syncedIds = await table.filter((r: any) => r._sincronizado === 1).primaryKeys();
   await table.bulkDelete(syncedIds);
-  const localData = serverData.map((item: any) => toLocal(item, true));
+  const localData = serverData.map((item: any) => toLocalMapper ? toLocalMapper(item) : toLocal(item, true));
   await table.bulkPut(localData);
   return localData as T[];
 }
@@ -625,7 +625,13 @@ export async function getFormularios(): Promise<Formulario[]> {
   if (!navigator.onLine) return localDB.formularios.toArray();
   try {
     const data = await apiFetch('/api/formularios');
-    return await safeBulkReplace(localDB.formularios, data);
+    return await safeBulkReplace(localDB.formularios, data, (item) => toLocal(item, true, {
+      idFormulario: item.id_formulario,
+      active: boolToNum(item.active),
+      velocidadKgSemana: item.velocidadKgSemana !== undefined ? item.velocidadKgSemana : item.velocidad_kg_semana,
+      fechaRegistro: item.fechaRegistro !== undefined ? item.fechaRegistro : item.fecha_registro,
+      nivelActividad: item.nivelActividad !== undefined ? item.nivelActividad : item.nivel_actividad
+    }));
   } catch {
     return localDB.formularios.toArray();
   }
@@ -670,7 +676,11 @@ export async function getMacros(): Promise<Macros[]> {
   if (!navigator.onLine) return localDB.macros.toArray();
   try {
     const data = await apiFetch('/api/macros');
-    return await safeBulkReplace(localDB.macros, data);
+    return await safeBulkReplace(localDB.macros, data, (item) => toLocal(item, true, { 
+      idMacro: item.id_macro,
+      idFormulario: item.id_formulario,
+      Calories: item.calories
+    }));
   } catch {
     return localDB.macros.toArray();
   }
@@ -713,7 +723,12 @@ export async function getDayliTracks(): Promise<DayliTrack[]> {
   if (!navigator.onLine) return localDB.dayliTracks.toArray();
   try {
     const data = await apiFetch('/api/dayli-tracks');
-    return await safeBulkReplace(localDB.dayliTracks, data);
+    return await safeBulkReplace(localDB.dayliTracks, data, (item) => toLocal(item, true, { 
+      idDayliTrack: item.id_dayli_track,
+      idMacro: item.id_macro,
+      caloriesCount: item.calories_count,
+      dateTrack: item.date_track
+    }));
   } catch {
     return localDB.dayliTracks.toArray();
   }
@@ -761,7 +776,11 @@ export async function getFoodLogs(): Promise<FoodLog[]> {
   if (!navigator.onLine) return localDB.foodLogs.toArray();
   try {
     const data = await apiFetch('/api/food-logs');
-    return await safeBulkReplace(localDB.foodLogs, data);
+    return await safeBulkReplace(localDB.foodLogs, data, (item) => toLocal(item, true, { 
+      idFoodLog: item.id_food_log,
+      idDayliTrack: item.id_dayli_track,
+      type_meal: item.type_meal || item.typeMeal
+    }));
   } catch {
     return localDB.foodLogs.toArray();
   }
