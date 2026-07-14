@@ -50,6 +50,15 @@ async function apiFetch(url: string, options?: RequestInit) {
   return response.json();
 }
 
+
+async function safeBulkReplace<T>(table: any, serverData: any[]): Promise<T[]> {
+  const syncedIds = await table.filter((r: any) => r._sincronizado === 1).primaryKeys();
+  await table.bulkDelete(syncedIds);
+  const localData = serverData.map((item: any) => toLocal(item, true));
+  await table.bulkPut(localData);
+  return localData as T[];
+}
+
 // ─── Operaciones locales con cola de sincronización ─────
 
 async function addToLocal<T>(
@@ -171,10 +180,7 @@ export async function getAreas(): Promise<Area[]> {
   if (!navigator.onLine) return localDB.areas.toArray();
   try {
     const data = await apiFetch('/api/areas');
-    await localDB.areas.clear();
-    const localData = data.map((a: any) => toLocal(a, true));
-    await localDB.areas.bulkPut(localData);
-    return localData as Area[];
+    return await safeBulkReplace(localDB.areas, data);
   } catch {
     return localDB.areas.toArray();
   }
@@ -228,10 +234,7 @@ export async function getProyectos(): Promise<Proyecto[]> {
   if (!navigator.onLine) return localDB.proyectos.toArray();
   try {
     const data = await apiFetch('/api/proyectos');
-    await localDB.proyectos.clear();
-    const localData = data.map((p: any) => toLocal(p, true));
-    await localDB.proyectos.bulkPut(localData);
-    return localData as Proyecto[];
+    return await safeBulkReplace(localDB.proyectos, data);
   } catch {
     return localDB.proyectos.toArray();
   }
@@ -282,10 +285,7 @@ export async function getMetricas(): Promise<Metrica[]> {
   if (!navigator.onLine) return localDB.metricas.toArray();
   try {
     const data = await apiFetch('/api/metricas');
-    await localDB.metricas.clear();
-    const localData = data.map((m: any) => toLocal(m, true));
-    await localDB.metricas.bulkPut(localData);
-    return localData as Metrica[];
+    return await safeBulkReplace(localDB.metricas, data);
   } catch {
     return localDB.metricas.toArray();
   }
@@ -338,10 +338,7 @@ export async function getProyectoMetricas(): Promise<ProyectoMetrica[]> {
   if (!navigator.onLine) return localDB.proyecto_metricas.toArray();
   try {
     const data = await apiFetch('/api/proyecto-metricas');
-    await localDB.proyecto_metricas.clear();
-    const localData = data.map((pm: any) => toLocal(pm, true));
-    await localDB.proyecto_metricas.bulkPut(localData);
-    return localData as ProyectoMetrica[];
+    return await safeBulkReplace(localDB.proyecto_metricas, data);
   } catch {
     return localDB.proyecto_metricas.toArray();
   }
@@ -392,10 +389,7 @@ export async function getRegistroEvaluaciones(): Promise<RegistroEvaluacion[]> {
   if (!navigator.onLine) return localDB.registro_evaluaciones.toArray();
   try {
     const data = await apiFetch('/api/registro-evaluaciones');
-    await localDB.registro_evaluaciones.clear();
-    const localData = data.map((r: any) => toLocal(r, true));
-    await localDB.registro_evaluaciones.bulkPut(localData);
-    return localData as RegistroEvaluacion[];
+    return await safeBulkReplace(localDB.registro_evaluaciones, data);
   } catch {
     return localDB.registro_evaluaciones.toArray();
   }
@@ -445,10 +439,7 @@ export async function getRewards(): Promise<Reward[]> {
   if (!navigator.onLine) return localDB.rewards.toArray();
   try {
     const data = await apiFetch('/api/rewards');
-    await localDB.rewards.clear();
-    const localData = data.map((r: any) => toLocal(r, true));
-    await localDB.rewards.bulkPut(localData);
-    return localData as Reward[];
+    return await safeBulkReplace(localDB.rewards, data);
   } catch {
     return localDB.rewards.toArray();
   }
@@ -491,10 +482,7 @@ export async function getPuntosUsados(): Promise<PuntosUsados[]> {
   if (!navigator.onLine) return localDB.puntos_usados.toArray();
   try {
     const data = await apiFetch('/api/puntos-usados');
-    await localDB.puntos_usados.clear();
-    const localData = data.map((pu: any) => toLocal(pu, true));
-    await localDB.puntos_usados.bulkPut(localData);
-    return localData as PuntosUsados[];
+    return await safeBulkReplace(localDB.puntos_usados, data);
   } catch {
     return localDB.puntos_usados.toArray();
   }
@@ -536,10 +524,7 @@ export async function getTasks(): Promise<Task[]> {
   if (!navigator.onLine) return localDB.tasks.toArray();
   try {
     const data = await apiFetch('/api/tasks');
-    await localDB.tasks.clear();
-    const localData = data.map((t: any) => toLocal(t, true));
-    await localDB.tasks.bulkPut(localData);
-    return localData as Task[];
+    return await safeBulkReplace(localDB.tasks, data);
   } catch {
     return localDB.tasks.toArray();
   }
@@ -582,10 +567,7 @@ export async function getPuntosGanados(): Promise<PuntosGanados[]> {
   if (!navigator.onLine) return localDB.puntos_ganados.toArray();
   try {
     const data = await apiFetch('/api/puntos-ganados');
-    await localDB.puntos_ganados.clear();
-    const localData = data.map((pg: any) => toLocal(pg, true));
-    await localDB.puntos_ganados.bulkPut(localData);
-    return localData as PuntosGanados[];
+    return await safeBulkReplace(localDB.puntos_ganados, data);
   } catch {
     return localDB.puntos_ganados.toArray();
   }
@@ -643,10 +625,7 @@ export async function getFormularios(): Promise<Formulario[]> {
   if (!navigator.onLine) return localDB.formularios.toArray();
   try {
     const data = await apiFetch('/api/formularios');
-    await localDB.formularios.clear();
-    const localData = data.map((f: any) => toLocal(f, true, { idFormulario: f.id_formulario, active: boolToNum(f.active) }));
-    await localDB.formularios.bulkPut(localData);
-    return localData as Formulario[];
+    return await safeBulkReplace(localDB.formularios, data);
   } catch {
     return localDB.formularios.toArray();
   }
@@ -691,14 +670,7 @@ export async function getMacros(): Promise<Macros[]> {
   if (!navigator.onLine) return localDB.macros.toArray();
   try {
     const data = await apiFetch('/api/macros');
-    await localDB.macros.clear();
-    const localData = data.map((m: any) => toLocal(m, true, { 
-      idMacro: m.id_macro,
-      idFormulario: m.id_formulario,
-      Calories: m.calories
-    }));
-    await localDB.macros.bulkPut(localData);
-    return localData as Macros[];
+    return await safeBulkReplace(localDB.macros, data);
   } catch {
     return localDB.macros.toArray();
   }
@@ -741,15 +713,7 @@ export async function getDayliTracks(): Promise<DayliTrack[]> {
   if (!navigator.onLine) return localDB.dayliTracks.toArray();
   try {
     const data = await apiFetch('/api/dayli-tracks');
-    await localDB.dayliTracks.clear();
-    const localData = data.map((dt: any) => toLocal(dt, true, { 
-      idDayliTrack: dt.id_dayli_track,
-      idMacro: dt.id_macro,
-      caloriesCount: dt.calories_count,
-      dateTrack: dt.date_track
-    }));
-    await localDB.dayliTracks.bulkPut(localData);
-    return localData as DayliTrack[];
+    return await safeBulkReplace(localDB.dayliTracks, data);
   } catch {
     return localDB.dayliTracks.toArray();
   }
@@ -797,14 +761,7 @@ export async function getFoodLogs(): Promise<FoodLog[]> {
   if (!navigator.onLine) return localDB.foodLogs.toArray();
   try {
     const data = await apiFetch('/api/food-logs');
-    await localDB.foodLogs.clear();
-    const localData = data.map((fl: any) => toLocal(fl, true, { 
-      idFoodLog: fl.id_food_log,
-      idDayliTrack: fl.id_dayli_track,
-      typeMeal: fl.type_meal
-    }));
-    await localDB.foodLogs.bulkPut(localData);
-    return localData as FoodLog[];
+    return await safeBulkReplace(localDB.foodLogs, data);
   } catch {
     return localDB.foodLogs.toArray();
   }

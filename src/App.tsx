@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import './App.css';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
-import { synchronizeData } from './services/sync';
+import { synchronizeData, downloadAllData } from './services/sync';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DashboardView } from './views/DashboardView';
 import { TareasView } from './views/TareasView';
@@ -21,7 +21,13 @@ function App() {
   // Escucha de sincronización global
   useEffect(() => {
     if (isOnline) {
-      synchronizeData().catch(console.error);
+      // 1. Subimos cambios locales pendientes a la nube
+      synchronizeData()
+        .then(() => {
+          // 2. Descargamos todo lo de la nube a local de forma segura
+          return downloadAllData();
+        })
+        .catch(console.error);
     }
   }, [isOnline]);
 

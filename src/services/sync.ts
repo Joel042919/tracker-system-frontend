@@ -136,3 +136,33 @@ export async function discardPendingOperation(id: number) {
   // Solo eliminamos la operación pendiente, dejamos el registro local tal como está.
   await localDB.pendingSync.delete(id);
 }
+
+// ─── Descarga Global Segura ───
+import { 
+  getAreas, getProyectos, getMetricas, getProyectoMetricas, getRegistroEvaluaciones,
+  getRewards, getPuntosUsados, getTasks, getPuntosGanados, getFormularios,
+  getMacros, getDayliTracks, getFoodLogs
+} from './api';
+
+export async function downloadAllData() {
+  if (!navigator.onLine) return;
+  try {
+    await Promise.all([
+      getAreas(),
+      getProyectos(),
+      getMetricas(),
+      getProyectoMetricas(),
+      getRegistroEvaluaciones(),
+      getRewards(),
+      getPuntosUsados(),
+      getTasks(),
+      getPuntosGanados(),
+      getFormularios(),
+      getMacros(),
+      getDayliTracks(),
+      getFoodLogs()
+    ]);
+  } catch (error) {
+    console.error("Error al descargar datos globales:", error);
+  }
+}
