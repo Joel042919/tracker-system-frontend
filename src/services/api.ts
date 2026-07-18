@@ -592,7 +592,7 @@ export async function getPointReviewTotal(): Promise<number> {
     return pr ? pr.total_puntos : 0;
   }
   try {
-    const data = await apiFetch('/api/point-review/total');
+    const data = await apiFetch('/api/point-review');
     const total = data.total_puntos || 0;
     await localDB.point_review.put({ id: 1, total_puntos: total });
     return total;

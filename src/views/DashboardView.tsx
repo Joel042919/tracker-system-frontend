@@ -89,7 +89,17 @@ export function DashboardView() {
       
       const chartData = pmRegistros.map(r => {
         let vals: any = {};
-        try { vals = JSON.parse(r.valores); } catch {}
+        try { 
+          vals = typeof r.valores === 'string' ? JSON.parse(r.valores) : r.valores; 
+          
+          if (vals && typeof vals === 'object') {
+            Object.keys(vals).forEach(k => {
+              if (typeof vals[k] === 'string' && vals[k] !== '' && !isNaN(Number(vals[k]))) {
+                vals[k] = Number(vals[k]);
+              }
+            });
+          }
+        } catch {}
         return {
           date: r.fecha_evaluacion ? r.fecha_evaluacion.slice(0, 10) : '', // Take only date part
           ...vals
@@ -99,7 +109,7 @@ export function DashboardView() {
       let keys: string[] = [];
       if (metric && metric.schema_esperado) {
         try {
-          const schema = JSON.parse(metric.schema_esperado);
+          const schema = typeof metric.schema_esperado === 'string' ? JSON.parse(metric.schema_esperado) : metric.schema_esperado;
           keys = Object.keys(schema);
         } catch {}
       } else if (chartData.length > 0) {
@@ -121,7 +131,12 @@ export function DashboardView() {
     const today = new Date(now.getTime() - offset).toISOString().slice(0, 10);
     
     const usados = await localDB.puntos_usados
-      .filter(p => p.reclaim_date.startsWith(today))
+      .filter(p => {
+        if (!p.reclaim_date) return false;
+        const d = new Date(p.reclaim_date);
+        const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        return localDate === today;
+      })
       .toArray();
     
     let totalGastados = 0;
@@ -187,7 +202,7 @@ export function DashboardView() {
                       <XAxis dataKey="date" stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: 'none', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="peso" stroke="var(--accent-primary)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="peso" stroke="var(--accent-primary)" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -200,7 +215,7 @@ export function DashboardView() {
                       <XAxis dataKey="date" stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: 'none', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="cintura" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="cintura" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -213,7 +228,7 @@ export function DashboardView() {
                       <XAxis dataKey="date" stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <YAxis domain={['auto', 'auto']} stroke="var(--text-muted)" tick={{ fontSize: 12 }} />
                       <Tooltip contentStyle={{ backgroundColor: 'var(--bg-secondary)', border: 'none', borderRadius: '8px' }} />
-                      <Line type="monotone" dataKey="bodyFat" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey="bodyFat" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -267,7 +282,7 @@ export function DashboardView() {
                         {mData.keys.map((key, kIdx) => {
                           const colors = ['var(--accent-primary)', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
                           return (
-                            <Line key={key} type="monotone" dataKey={key} stroke={colors[kIdx % colors.length]} strokeWidth={3} dot={{ r: 4 }} />
+                            <Line key={key} type="monotone" dataKey={key} stroke={colors[kIdx % colors.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} isAnimationActive={false} />
                           );
                         })}
                       </LineChart>
