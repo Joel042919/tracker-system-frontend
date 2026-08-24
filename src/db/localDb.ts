@@ -224,6 +224,107 @@ export interface FoodLog {
   _ultimaModificacion?: string;
 }
 
+// ── Módulo de Finanzas ────────────────────────────────────
+
+export interface Medio {
+  id: string;                 // UUID (PK)
+  medio: string;
+  tipo_medio: string;         // 'yape', 'efectivo', 'cuenta_bancaria', 'tarjeta_credito', etc.
+  numero_cuenta?: string | null;
+  banco?: string | null;
+  estado: number;             // 0 o 1
+  saldo_actual?: number;      // Saldo disponible calculado/sincronizado
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface SaldoActual {
+  id: string;                 // UUID (PK)
+  saldo: number;
+  medio_id: string;           // UUID ref: medio.id
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface CategoriaFinanzas {
+  id: string;                 // UUID (PK)
+  categoria: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface Movimiento {
+  id: string;                 // UUID (PK)
+  medio_id: string;           // UUID
+  categoria_id?: string | null; // UUID
+  tipo: 'I' | 'E';            // 'I' (Ingreso), 'E' (Egreso)
+  fecha_movimiento: string;   // ISO
+  descripcion?: string | null;
+  monto: number;
+  egreso_fijo_id?: string | null; // UUID
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface EgresoFijo {
+  id: string;                 // UUID (PK)
+  razon: string;
+  descripcion?: string | null;
+  categoria_id?: string | null;
+  monto: number;
+  programacion_pago: string | Record<string, any>; // JSON
+  recordatorio_dias_antes: number;
+  activo: number;             // 0 o 1
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface PagoProgramado {
+  id: string;                 // UUID (PK)
+  egreso_fijo_id: string;     // UUID
+  fecha_programada: string;   // "YYYY-MM-DD"
+  monto_esperado: number;
+  estado: 'pendiente' | 'pagado' | 'vencido' | 'cancelado';
+  fecha_pago?: string | null;
+  medio_id?: string | null;
+  movimiento_id?: string | null;
+  notas?: string | null;
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface Presupuesto {
+  id: string;                 // UUID (PK)
+  nombre: string;
+  categoria_id?: string | null;
+  monto_limite: number;
+  periodo: 'diario' | 'semanal' | 'mensual' | 'anual';
+  fecha_inicio: string;       // "YYYY-MM-DD"
+  fecha_fin?: string | null;
+  activo: number;             // 0 o 1
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
+export interface AlertaPago {
+  id: string;                 // UUID (PK)
+  pago_programado_id: string; // UUID
+  tipo_alerta: 'recordatorio' | 'vencimiento' | 'vencido';
+  mensaje: string;
+  leida: number;              // 0 o 1
+  fecha_alerta?: string;
+  created_at?: string;
+  _sincronizado: number;
+  _ultimaModificacion?: string;
+}
+
 export interface PendingOperation {
   id?: number;
   type: 'CREATE' | 'UPDATE' | 'DELETE';
@@ -252,6 +353,14 @@ class TrackerDB extends Dexie {
   macros!: Table<Macros, string>;               // PK string
   dayliTracks!: Table<DayliTrack, string>;      // PK string
   foodLogs!: Table<FoodLog, string>;            // PK string
+  medios!: Table<Medio, string>;                // PK string
+  saldos_actuales!: Table<SaldoActual, string>; // PK string
+  categorias_finanzas!: Table<CategoriaFinanzas, string>; // PK string
+  movimientos!: Table<Movimiento, string>;      // PK string
+  egresos_fijos!: Table<EgresoFijo, string>;    // PK string
+  pagos_programados!: Table<PagoProgramado, string>; // PK string
+  presupuestos!: Table<Presupuesto, string>;    // PK string
+  alertas_pago!: Table<AlertaPago, string>;      // PK string
   pendingSync!: Table<PendingOperation, number>;
   point_review!: Table<PointReview, number>;
 
@@ -280,6 +389,17 @@ class TrackerDB extends Dexie {
       proyecto_tareas:        '++id, id_proyecto_habito, orden, activo, _sincronizado',
       registro_habitos:       '++id, id_proyecto_habito, fecha, completado, _sincronizado',
       registro_tareas:        '++id, id_proyecto_tarea, id_registro_habito, completado, _sincronizado',
+    });
+
+    this.version(3).stores({
+      medios:                 '&id, tipo_medio, estado, _sincronizado',
+      saldos_actuales:        '&id, &medio_id, _sincronizado',
+      categorias_finanzas:    '&id, _sincronizado',
+      movimientos:            '&id, medio_id, categoria_id, tipo, fecha_movimiento, egreso_fijo_id, _sincronizado',
+      egresos_fijos:          '&id, categoria_id, activo, _sincronizado',
+      pagos_programados:      '&id, egreso_fijo_id, fecha_programada, estado, _sincronizado',
+      presupuestos:           '&id, categoria_id, activo, _sincronizado',
+      alertas_pago:           '&id, pago_programado_id, leida, fecha_alerta, _sincronizado',
     });
   }
 }

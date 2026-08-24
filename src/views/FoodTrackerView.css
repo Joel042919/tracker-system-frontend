@@ -1,0 +1,105 @@
+.food-tracker-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+@media (min-width: 768px) {
+  .food-tracker-container {
+    padding: 24px;
+    gap: 24px;
+  }
+}
+
+.food-tracker-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .food-tracker-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.food-header-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.food-tracker-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (min-width: 992px) {
+  .food-tracker-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+  }
+}
+
+/* ── Formulario IA ── */
+.food-ia-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.food-select {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.food-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.food-textarea:focus, .food-select:focus {
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+.food-submit-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 12px;
+}
+
+@media (min-width: 768px) {
+  .food-select {
+    width: auto;
+    min-width: 180px;
+  }
+}

@@ -24,6 +24,9 @@ export function TareasView() {
   // Estado para el Modal de Edición
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
+  // Estado para filtro de columnas en móvil
+  const [mobileTab, setMobileTab] = useState<'all' | 'do' | 'doing' | 'done'>('all');
+
   const tasks = useLiveQuery(() => localDB.tasks.toArray(), []) || [];
 
   // ─── HANDLERS DE CREACIÓN ───
@@ -190,9 +193,31 @@ export function TareasView() {
         </div>
       </form>
 
+      {/* ─── SELECTOR DE COLUMNAS PARA MÓVIL ─── */}
+      <div className="kanban-mobile-tabs">
+        <button 
+          className={`mobile-tab-btn ${mobileTab === 'all' ? 'active' : ''}`}
+          onClick={() => setMobileTab('all')}
+        >
+          Todas ({tasks.length})
+        </button>
+        {COLUMNS.map(c => {
+          const count = tasks.filter(t => t.status === c.id).length;
+          return (
+            <button
+              key={c.id}
+              className={`mobile-tab-btn ${mobileTab === c.id ? 'active' : ''}`}
+              onClick={() => setMobileTab(c.id as any)}
+            >
+              {c.title} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       {/* ─── TABLERO KANBAN ─── */}
       <div className="kanban-board">
-        {COLUMNS.map(column => {
+        {COLUMNS.filter(c => mobileTab === 'all' || mobileTab === c.id).map(column => {
           const columnTasks = tasks.filter(t => t.status === column.id);
           const Icon = column.icon;
 

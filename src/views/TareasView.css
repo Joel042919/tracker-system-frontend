@@ -4,7 +4,15 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 20px;
+  gap: 16px;
+  padding: 12px;
+}
+
+@media (min-width: 768px) {
+  .kanban-container {
+    gap: 20px;
+    padding: 0;
+  }
 }
 
 .kanban-header-bar {
@@ -23,17 +31,17 @@
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
   padding: 16px;
-  border-radius: 20px;
+  border-radius: 16px;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .add-task-input {
-  flex: 1;
+  width: 100%;
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--glass-border);
@@ -41,6 +49,7 @@
   color: var(--text-main);
   outline: none;
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 .add-task-input:focus {
@@ -48,7 +57,7 @@
 }
 
 .add-task-btn {
-  padding: 10px 20px;
+  padding: 12px 20px;
   border-radius: 10px;
   border: none;
   background: var(--accent-primary);
@@ -67,35 +76,79 @@
 @media (min-width: 768px) {
   .form-row {
     flex-direction: row;
+    align-items: center;
   }
   .add-task-form {
     padding: 20px;
+    border-radius: 20px;
+  }
+}
+
+/* ─── SELECTOR DE COLUMNAS PARA MÓVIL ─── */
+.kanban-mobile-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kanban-mobile-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-tab-btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.mobile-tab-btn.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+  font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .kanban-mobile-tabs {
+    display: none;
   }
 }
 
 /* ─── KANBAN MOBILE FIRST ─── */
 .kanban-board {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   height: 100%;
-  min-height: 60vh;
+  min-height: 50vh;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding-bottom: 20px; /* Espacio para el scrollbar */
+  padding-bottom: 16px;
 }
 
 /* Las columnas ocupan casi toda la pantalla en móvil */
 .kanban-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   background: rgba(128, 128, 128, 0.05);
-  border-radius: 24px;
-  padding: 16px;
+  border-radius: 20px;
+  padding: 14px;
   min-width: 85vw; 
   flex-shrink: 0;
   scroll-snap-align: center;
   transition: background 0.3s ease;
+  box-sizing: border-box;
 }
 
 .kanban-column.drag-over {
@@ -108,31 +161,35 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     overflow-x: visible;
+    gap: 20px;
   }
   .kanban-column {
     min-width: 0;
+    padding: 16px;
+    border-radius: 24px;
   }
 }
 
 .kanban-column-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--text-main);
-  margin-bottom: 8px;
-  padding-left: 8px;
+  margin-bottom: 4px;
+  padding-left: 4px;
 }
 
 /* ─── TARJETAS ─── */
 .kanban-card {
   cursor: grab;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  border-radius: 14px;
 }
 
 .kanban-card:active {
@@ -148,12 +205,12 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 
 .kanban-card-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-main);
   font-weight: 500;
   word-break: break-word;
@@ -161,7 +218,7 @@
 
 .card-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .action-btn {
@@ -185,7 +242,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -195,7 +252,7 @@
   padding: 2px 8px;
   border-radius: 12px;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 /* ─── MODAL DE EDICIÓN ─── */
@@ -208,7 +265,7 @@
   display: grid;
   place-items: center;
   z-index: 1000;
-  padding: 20px;
+  padding: 16px;
 }
 
 .modal-content {
@@ -217,25 +274,27 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .btn-cancel {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, Folder, BarChart2, CheckSquare, Calendar, Gift, Apple, Sun, Moon, Menu, Database, X, BookOpen } from 'lucide-react';
+import { Home, Folder, BarChart2, CheckSquare, Calendar, Gift, Apple, Sun, Moon, Menu, Database, X, BookOpen, Wallet } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import './Sidebar.css';
@@ -11,6 +11,7 @@ export function Sidebar() {
 
   const menuItems = [
     { icon: Home, path: '/', label: 'Inicio', tooltip: 'Dashboard' },
+    { icon: Wallet, path: '/finanzas', label: 'Finanzas', tooltip: 'Billetera y Finanzas' },
     { icon: Folder, path: '/proyectos', label: 'Proyectos', tooltip: 'Áreas y Proyectos' },
     { icon: CheckSquare, path: '/tareas', label: 'Tareas', tooltip: 'Tareas' },
     { icon: Calendar, path: '/evaluacion', label: 'Evaluación', tooltip: 'Evaluaciones' },
@@ -57,12 +58,14 @@ export function Sidebar() {
         </div>
 
         {/* Botón de Tema */}
-        <div className="tooltip-container" style={{ marginTop: 'auto', paddingTop: '20px' }}>
-          <button onClick={toggleTheme} className="sidebar-btn">
-            {theme === 'light' ? <Moon size={22} className="sidebar-icon" /> : <Sun size={22} className="sidebar-icon" />}
-            <span className="sidebar-label">Tema ({theme})</span>
-          </button>
-          <span className="tooltip-text">Modo {theme === 'light' ? 'Oscuro' : 'Claro'}</span>
+        <div className="sidebar-bottom">
+          <div className="tooltip-container">
+            <button onClick={toggleTheme} className="sidebar-btn">
+              {theme === 'light' ? <Moon size={20} className="sidebar-icon" /> : <Sun size={20} className="sidebar-icon" />}
+              <span className="sidebar-label">Tema ({theme})</span>
+            </button>
+            <span className="tooltip-text">Modo {theme === 'light' ? 'Oscuro' : 'Claro'}</span>
+          </div>
         </div>
 
         {/* Botón de cerrar cruz (solo móvil) */}

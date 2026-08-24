@@ -19,6 +19,14 @@ const tableMap: Record<string, any> = {
   'proyecto-tareas': localDB.proyecto_tareas,
   'registro-habitos': localDB.registro_habitos,
   'registro-tareas': localDB.registro_tareas,
+  'medios': localDB.medios,
+  'saldos': localDB.saldos_actuales,
+  'categorias': localDB.categorias_finanzas,
+  'movimientos': localDB.movimientos,
+  'egresos-fijos': localDB.egresos_fijos,
+  'pagos-programados': localDB.pagos_programados,
+  'presupuestos': localDB.presupuestos,
+  'alertas-pago': localDB.alertas_pago,
 };
 
 function getTableFromEndpoint(endpoint: string) {
@@ -146,7 +154,9 @@ import {
   getAreas, getProyectos, getMetricas, getProyectoMetricas, getRegistroEvaluaciones,
   getRewards, getPuntosUsados, getTasks, getPuntosGanados, getFormularios,
   getMacros, getDayliTracks, getFoodLogs,
-  getProyectoHabitos, getProyectoTareas, getRegistroHabitos, getRegistroTareas
+  getProyectoHabitos, getProyectoTareas, getRegistroHabitos, getRegistroTareas,
+  getMedios, getCategoriasFinanzas, getMovimientos, getEgresosFijos,
+  getPagosProgramados, getPresupuestos, getAlertasPago
 } from './api';
 
 export async function downloadAllData() {
@@ -169,7 +179,14 @@ export async function downloadAllData() {
       getProyectoHabitos(),
       getProyectoTareas(),
       getRegistroHabitos(),
-      getRegistroTareas()
+      getRegistroTareas(),
+      getMedios(),
+      getCategoriasFinanzas(),
+      getMovimientos(),
+      getEgresosFijos(),
+      getPagosProgramados(),
+      getPresupuestos(),
+      getAlertasPago()
     ]);
   } catch (error) {
     console.error("Error al descargar datos globales:", error);

@@ -12,6 +12,7 @@ import { EvaluacionView } from './views/EvaluacionView';
 
 import { PremiosView } from './views/PremiosView';
 import { FoodTrackerView } from './views/FoodTrackerView';
+import { FinanzasView } from './views/FinanzasView';
 import BookOpen from './views/BookOpen';
 import { SyncAdminView } from './views/SyncAdminView';
 
@@ -36,6 +37,7 @@ function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<DashboardView />} />
+          <Route path="/finanzas" element={<FinanzasView />} />
           <Route path="/proyectos" element={<GestionAreasView />} />
           <Route path="/proyectos/:areaId" element={<DetalleAreaView />} />
           <Route path="/tareas" element={<TareasView />} />

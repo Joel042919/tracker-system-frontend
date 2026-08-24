@@ -16,7 +16,10 @@ export function SyncAdminView() {
       'areas', 'proyectos', 'metricas', 'proyecto_metricas', 
       'registro_evaluaciones', 'rewards', 'puntos_usados', 
       'tasks', 'puntos_ganados', 'formularios', 'macros', 
-      'dayliTracks', 'foodLogs'
+      'dayliTracks', 'foodLogs',
+      'proyecto_habitos', 'proyecto_tareas', 'registro_habitos', 'registro_tareas',
+      'medios', 'saldos_actuales', 'categorias_finanzas', 'movimientos',
+      'egresos_fijos', 'pagos_programados', 'presupuestos', 'alertas_pago'
     ];
     
     const statuses = await Promise.all(tables.map(async (tableName) => {

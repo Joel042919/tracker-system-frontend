@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { localDB, type FoodLog } from '../db/localDb';
 import { createFormulario, updateFormulario, getFormularios, getMacros, getDayliTracks, getFoodLogs, createFoodLog, updateDayliTrack, createDayliTrack, deleteFoodLog } from '../services/api';
 import { Apple, Droplets, Target, Activity, Send, Trash2, X, Edit2 } from 'lucide-react';
-import './EvaluacionView.css'; 
+import './EvaluacionView.css';
+import './FoodTrackerView.css';
 
 export function FoodTrackerView() {
   const [showFormModal, setShowFormModal] = useState(false);
@@ -82,7 +83,6 @@ export function FoodTrackerView() {
       });
     }
     setShowFormModal(false);
-    // Como el backend auto-crea o actualiza las macros, forzamos la recarga de datos:
     if (navigator.onLine) {
       await getFormularios();
       await getMacros();
@@ -95,7 +95,7 @@ export function FoodTrackerView() {
     setLoadingAI(true);
     try {
       await createFoodLog({
-        idDayliTrack: dailyTrack?.idDayliTrack || "", // Si está vacío el backend lo creará
+        idDayliTrack: dailyTrack?.idDayliTrack || "",
         typeMeal: typeMeal,
         food: foodText,
       });
@@ -112,14 +112,26 @@ export function FoodTrackerView() {
     }
   };
 
-  const handleAddWater = async (ml: number) => {
+  // ── Corrección de cálculo de agua (Normalizado a ML) ──
+  const targetWaterMl = activeMacro?.water
+    ? (activeMacro.water < 20 ? Math.round(activeMacro.water * 1000) : activeMacro.water)
+    : 2500;
+  
+  const currentWaterMl = dailyTrack?.water
+    ? (dailyTrack.water < 20 ? Math.round(dailyTrack.water * 1000) : dailyTrack.water)
+    : 0;
+
+  const targetWaterL = (targetWaterMl / 1000).toFixed(1);
+  const currentWaterL = (currentWaterMl / 1000).toFixed(2);
+  const waterPercent = Math.min(100, Math.round((currentWaterMl / targetWaterMl) * 100)) || 0;
+
+  const handleAddWater = async (deltaMl: number) => {
+    const newWater = Math.max(0, currentWaterMl + deltaMl);
     if (!dailyTrack) {
-      // Creamos un DayliTrack inicial si no existe
       if (!activeMacro) {
         alert("Debes establecer tu meta primero para poder registrar agua.");
         return;
       }
-      const newWater = ml < 0 ? 0 : ml;
       await createDayliTrack({
         idMacro: activeMacro.idMacro,
         water: newWater,
@@ -131,10 +143,9 @@ export function FoodTrackerView() {
         fiber: 0
       });
     } else {
-      const newWater = (dailyTrack.water || 0) + ml;
       await updateDayliTrack(dailyTrack.idDayliTrack, {
         ...dailyTrack,
-        water: newWater < 0 ? 0 : newWater
+        water: newWater
       });
     }
     if (navigator.onLine) {
@@ -162,153 +173,159 @@ export function FoodTrackerView() {
   const currentCarbs = dailyTrack?.carbs || 0;
   const targetFat = activeMacro?.fat || 70;
   const currentFat = dailyTrack?.fat || 0;
-  const targetWater = activeMacro?.water || 2500;
-  const currentWater = dailyTrack?.water || 0;
 
   const getPercent = (c: number, t: number) => Math.min(100, Math.round((c / t) * 100)) || 0;
 
   return (
-    <div className="evaluacion-container" style={{ padding: '24px' }}>
-      <div className="evaluacion-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="food-tracker-container">
+      <div className="food-tracker-header">
         <div>
-          <h1>Food Tracker</h1>
-          <p>Control de dieta y macros potenciado por IA.</p>
+          <h1 style={{ margin: '0 0 6px 0', fontSize: '26px', color: 'var(--text-main)' }}>Food Tracker</h1>
+          <p style={{ margin: 0, color: 'var(--text-muted)' }}>Control de dieta y macros potenciado por IA.</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div className="food-header-buttons">
           {activeForm && (
             <button className="btn-secondary" onClick={() => { setFormMode('edit'); setShowFormModal(true); }}>
-              <Edit2 size={18} /> Editar Formulario Actual
+              <Edit2 size={16} /> Editar Perfil
             </button>
           )}
           <button className="btn-primary" onClick={() => { setFormMode('new'); setShowFormModal(true); }}>
-            <Target size={18} /> Actualizar Mi Meta (Nuevo)
+            <Target size={16} /> Nueva Meta
           </button>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '24px' }}>
+      <div className="food-tracker-grid">
         
         {/* PROGRESS CARDS */}
-        <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h2 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Activity size={20} color="var(--accent)" /> Progreso Diario
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <h2 style={{ marginBottom: '16px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+              <Activity size={18} color="var(--accent-primary)" /> Progreso Diario
             </h2>
             
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-                <span>Calorías</span>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Calorías</span>
                 <strong>{currentCals} / {targetCals} kcal</strong>
               </div>
-              <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
                 <div style={{ width: `${getPercent(currentCals, targetCals)}%`, background: 'var(--accent-primary)', height: '100%', transition: 'width 0.3s' }} />
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-                <span>Proteínas</span>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Proteínas</span>
                 <strong>{currentProt} / {targetProt} g</strong>
               </div>
-              <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
                 <div style={{ width: `${getPercent(currentProt, targetProt)}%`, background: '#ff7b72', height: '100%', transition: 'width 0.3s' }} />
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-                <span>Carbohidratos</span>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Carbohidratos</span>
                 <strong>{currentCarbs} / {targetCarbs} g</strong>
               </div>
-              <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
                 <div style={{ width: `${getPercent(currentCarbs, targetCarbs)}%`, background: '#f0883e', height: '100%', transition: 'width 0.3s' }} />
               </div>
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '4px' }}>
-                <span>Grasas</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Grasas</span>
                 <strong>{currentFat} / {targetFat} g</strong>
               </div>
-              <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: '10px', borderRadius: '5px', overflow: 'hidden' }}>
                 <div style={{ width: `${getPercent(currentFat, targetFat)}%`, background: '#d2a8ff', height: '100%', transition: 'width 0.3s' }} />
               </div>
             </div>
           </div>
 
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h2 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Droplets size={20} color="#79c0ff" /> Agua ({currentWater/1000} / {targetWater} ml)
+          {/* WATER TRACKER CARD */}
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <h2 style={{ marginBottom: '14px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+              <Droplets size={18} color="#79c0ff" /> Agua ({currentWaterL} L / {targetWaterL} L)
             </h2>
-            <div style={{ width: '100%', background: 'rgba(255,255,255,0.1)', height: '12px', borderRadius: '6px', overflow: 'hidden', marginBottom: '16px' }}>
-              <div style={{ width: `${getPercent(currentWater, targetWater)}%`, background: '#79c0ff', height: '100%', transition: 'width 0.3s' }} />
+            <div style={{ width: '100%', background: 'rgba(255,255,255,0.08)', height: '10px', borderRadius: '5px', overflow: 'hidden', marginBottom: '14px' }}>
+              <div style={{ width: `${waterPercent}%`, background: '#79c0ff', height: '100%', transition: 'width 0.3s' }} />
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-icon" style={{ flex: 1, background: 'rgba(255,255,255,0.05)' }} onClick={() => handleAddWater(-250)}>- 250ml</button>
-              <button className="btn-icon" style={{ flex: 1, background: 'rgba(121,192,255,0.2)' }} onClick={() => handleAddWater(250)}>+ 250ml</button>
+              <button className="btn-icon" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '13px' }} onClick={() => handleAddWater(-250)}>
+                - 250 ml
+              </button>
+              <button className="btn-icon" style={{ flex: 1, padding: '10px', background: 'rgba(121,192,255,0.2)', color: '#79c0ff', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px' }} onClick={() => handleAddWater(250)}>
+                + 250 ml
+              </button>
             </div>
           </div>
         </div>
 
-        {/* FOOD LOG INPUT */}
-        <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h2 style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Apple size={20} color="#ff7b72" /> Agregar Comida (IA)
+        {/* FOOD LOG INPUT & HISTORY */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <h2 style={{ marginBottom: '14px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-main)' }}>
+              <Apple size={18} color="#ff7b72" /> Agregar Comida (IA)
             </h2>
-            <form onSubmit={handleAddFood} style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+            
+            <form onSubmit={handleAddFood} className="food-ia-form">
               <select 
-                className="input-field" 
+                className="food-select" 
                 value={typeMeal} 
                 onChange={e => setTypeMeal(e.target.value)}
-                style={{ width: '150px' }}
               >
-                <option value="breakfast">Desayuno</option>
-                <option value="lunch">Almuerzo</option>
-                <option value="dinner">Cena</option>
-                <option value="snack">Snack</option>
+                <option value="breakfast">🌅 Desayuno</option>
+                <option value="lunch">☀️ Almuerzo</option>
+                <option value="dinner">🌙 Cena</option>
+                <option value="snack">🍎 Snack / Merienda</option>
               </select>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  className="input-field" 
-                  style={{ flex: 1 }}
-                  placeholder="Ej: 2 huevos revueltos con un pan integral"
-                  value={foodText}
-                  onChange={e => setFoodText(e.target.value)}
-                  disabled={loadingAI}
-                />
-                <button type="submit" className="btn-primary" disabled={loadingAI}>
-                  {loadingAI ? 'Calculando...' : <><Send size={16}/> Enviar</>}
-                </button>
-              </div>
+
+              <textarea 
+                className="food-textarea" 
+                rows={3}
+                placeholder="Describe tu comida detallando porciones. Ej: 2 huevos revueltos con un pan integral y un vaso de jugo de naranja..."
+                value={foodText}
+                onChange={e => setFoodText(e.target.value)}
+                disabled={loadingAI}
+              />
+
+              <button type="submit" className="btn-primary food-submit-btn" disabled={loadingAI}>
+                {loadingAI ? 'Calculando con IA...' : <><Send size={18}/> Analizar y Registrar Comida</>}
+              </button>
             </form>
           </div>
 
-          <div className="glass-card" style={{ padding: '24px', flex: 1 }}>
-            <h3 style={{ marginBottom: '16px' }}>Comidas Registradas Hoy</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="glass-card" style={{ padding: '20px', flex: 1 }}>
+            <h3 style={{ margin: '0 0 14px 0', fontSize: '16px', color: 'var(--text-main)' }}>Comidas Registradas Hoy</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {(!foodLogs || foodLogs.length === 0) && (
-                <p className="text-muted" style={{ fontSize: '14px' }}>No hay registros de comidas hoy.</p>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                  No hay registros de comidas para el día de hoy.
+                </p>
               )}
               {foodLogs?.map(fl => (
-                <div key={fl.idFoodLog} style={{ padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', position: 'relative' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <strong>{fl.type_meal?.toUpperCase()}</strong>
-                    <span style={{ fontSize: '14px', color: 'var(--accent)' }}>{fl.calories} kcal</span>
+                <div key={fl.idFoodLog} style={{ padding: '12px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '13px', color: 'var(--accent-primary)', textTransform: 'uppercase' }}>
+                      {fl.type_meal}
+                    </strong>
+                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#ff7b72' }}>{fl.calories} kcal</span>
                   </div>
-                  <p style={{ margin: '8px 0', fontSize: '14px' }}>{fl.food}</p>
+                  <p style={{ margin: '6px 0', fontSize: '14px', color: 'var(--text-main)' }}>{fl.food}</p>
                   <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                    <span>P: {fl.protein}g</span>
-                    <span>C: {fl.carbs}g</span>
-                    <span>G: {fl.fat}g</span>
-                    <span>F: {fl.fiber}g</span>
+                    <span>Prot: <strong>{fl.protein}g</strong></span>
+                    <span>Carbs: <strong>{fl.carbs}g</strong></span>
+                    <span>Grasas: <strong>{fl.fat}g</strong></span>
+                    <span>Fibra: <strong>{fl.fiber}g</strong></span>
                   </div>
                   <button 
                     className="btn-icon danger" 
-                    style={{ position: 'absolute', right: '8px', bottom: '8px', padding: '4px' }}
+                    style={{ position: 'absolute', right: '8px', bottom: '8px', padding: '6px' }}
                     onClick={() => handleDeleteFood(fl)}
-                    title="Eliminar"
+                    title="Eliminar comida"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -321,67 +338,69 @@ export function FoodTrackerView() {
       </div>
 
       {showFormModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ maxWidth: '500px' }}>
-            <button className="modal-close" onClick={() => setShowFormModal(false)}>
-              <X size={20} />
-            </button>
-            <h2>{formMode === 'edit' ? 'Editar Formulario Actual' : 'Configurar Perfil & Meta (Nuevo)'}</h2>
+        <div className="modal-overlay" onClick={() => setShowFormModal(false)}>
+          <div className="modal-content glass-card" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{formMode === 'edit' ? 'Editar Perfil Actual' : 'Configurar Perfil & Meta (Nuevo)'}</h2>
+              <button className="action-btn" onClick={() => setShowFormModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
             
-            <form onSubmit={handleSaveForm} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+            <form onSubmit={handleSaveForm} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                   <label>Género</label>
                   <select className="glass-select" value={formValues.gender} onChange={e => setFormValues({...formValues, gender: e.target.value})}>
                     <option value="M">Hombre</option>
                     <option value="F">Mujer</option>
                   </select>
                 </div>
-                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                   <label>Edad</label>
                   <input type="number" required className="form-input" value={formValues.edad} onChange={e => setFormValues({...formValues, edad: parseInt(e.target.value) || 0})} />
                 </div>
               </div>
               
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                   <label>Peso (kg)</label>
                   <input type="number" step="0.1" required className="form-input" value={formValues.peso} onChange={e => setFormValues({...formValues, peso: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                   <label>Altura (cm)</label>
                   <input type="number" required className="form-input" value={formValues.altura} onChange={e => setFormValues({...formValues, altura: parseInt(e.target.value) || 0})} />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '90px' }}>
                   <label>Cuello (cm)</label>
                   <input type="number" step="0.1" className="form-input" value={formValues.cuello} onChange={e => setFormValues({...formValues, cuello: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '90px' }}>
                   <label>Cintura (cm)</label>
                   <input type="number" step="0.1" className="form-input" value={formValues.cintura} onChange={e => setFormValues({...formValues, cintura: parseFloat(e.target.value) || 0})} />
                 </div>
-                <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '90px' }}>
                   <label>Cadera (cm)</label>
                   <input type="number" step="0.1" className="form-input" value={formValues.cadera} onChange={e => setFormValues({...formValues, cadera: parseFloat(e.target.value) || 0})} />
                 </div>
               </div>
 
               <div className="form-group">
-                <label>Nivel de Actividad (1-Sedentario, 5-Muy Intenso)</label>
+                <label>Nivel de Actividad</label>
                 <select className="glass-select" value={formValues.nivelActividad} onChange={e => setFormValues({...formValues, nivelActividad: parseInt(e.target.value)})}>
                   <option value={1}>1 - Sedentario</option>
-                  <option value={2}>2 - Ligero</option>
-                  <option value={3}>3 - Moderado</option>
-                  <option value={4}>4 - Intenso</option>
-                  <option value={5}>5 - Muy Intenso</option>
+                  <option value={2}>2 - Ligero (1-3 días/sem)</option>
+                  <option value={3}>3 - Moderado (3-5 días/sem)</option>
+                  <option value={4}>4 - Intenso (6-7 días/sem)</option>
+                  <option value={5}>5 - Muy Intenso / Atleta</option>
                 </select>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                   <label>Meta</label>
                   <select className="glass-select" value={formValues.meta} onChange={e => setFormValues({...formValues, meta: e.target.value})}>
                     <option value="bajar">Bajar de Peso</option>
@@ -390,16 +409,17 @@ export function FoodTrackerView() {
                   </select>
                 </div>
                 {formValues.meta !== 'mantener' && (
-                  <div className="form-group" style={{ flex: 1, minWidth: '150px' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '140px' }}>
                     <label>Velocidad (kg/sem)</label>
                     <input type="number" step="0.1" className="form-input" value={formValues.velocidadKgSemana} onChange={e => setFormValues({...formValues, velocidadKgSemana: parseFloat(e.target.value) || 0})} />
                   </div>
                 )}
               </div>
 
-              <button type="submit" className="btn-primary" style={{ marginTop: '8px' }}>
-                Guardar y Calcular Macros
-              </button>
+              <div className="modal-footer">
+                <button type="button" className="action-btn" onClick={() => setShowFormModal(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary">Guardar y Calcular Macros</button>
+              </div>
             </form>
           </div>
         </div>

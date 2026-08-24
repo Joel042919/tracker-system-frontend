@@ -15,6 +15,7 @@
   cursor: pointer;
   border: 1px solid var(--glass-border);
   box-shadow: var(--card-shadow);
+  background: var(--glass-bg);
 }
 
 /* Fondo oscuro (overlay) cuando el menú está abierto */
@@ -35,7 +36,7 @@
   width: 280px;
   height: 100vh;
   margin: 0;
-  padding: 30px 20px;
+  padding: 24px 16px;
   border-radius: 0 24px 24px 0;
   display: flex;
   flex-direction: column;
@@ -43,11 +44,10 @@
   box-sizing: border-box;
   transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-/* Ocultar barra de scroll para Chrome/Safari/Webkit */
 .sidebar-container::-webkit-scrollbar {
   display: none;
 }
@@ -60,45 +60,47 @@
 .sidebar-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
 }
 
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 30px;
+  gap: 14px;
+  margin-bottom: 20px;
   color: var(--text-main);
   font-weight: bold;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .logo-icon {
-  width: 40px; 
-  height: 40px; 
+  width: 38px; 
+  height: 38px; 
   background: var(--accent-primary); 
-  border-radius: 12px; 
+  border-radius: 10px; 
   display: grid; 
   place-items: center; 
   color: white;
+  flex-shrink: 0;
 }
 
 /* Links en móvil (Lista vertical amplia) */
 .sidebar-link, .sidebar-btn {
   color: var(--text-muted);
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 10px 14px;
   background: none;
   border: none;
   cursor: pointer;
   width: 100%;
-  border-radius: 12px;
+  border-radius: 10px;
   text-decoration: none;
+  box-sizing: border-box;
 }
 
 .sidebar-link.active {
@@ -112,14 +114,20 @@
 }
 
 .sidebar-label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
+}
+
+.sidebar-bottom {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 14px;
 }
 
 .mobile-close-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 18px;
+  right: 18px;
   background: none;
   border: none;
   cursor: pointer;
@@ -136,70 +144,135 @@
 }
 
 
-/* ── DISEÑO DE ESCRITORIO (Sidebar Fijo Lateral) ── */
+/* ── DISEÑO DE ESCRITORIO (Sidebar Fijo Lateral Centrado y Compacto) ── */
 @media (min-width: 768px) {
   /* Ocultamos cosas exclusivas de móvil */
   .mobile-menu-toggle, .sidebar-overlay, .mobile-close-btn, .sidebar-title-mobile {
-    display: none; 
+    display: none !important; 
   }
 
   .sidebar-container {
-    position: static; /* Ya no es fixed, fluye con el Layout */
-    width: 80px;
-    height: 95vh;
-    margin: 2.5vh 0 2.5vh 20px;
-    padding: 30px 0;
-    border-radius: 24px;
+    position: static;
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
+    height: calc(100vh - 32px);
+    max-height: calc(100vh - 32px);
+    margin: 16px 0 16px 14px;
+    padding: 16px 0;
+    border-radius: 20px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    justify-content: space-between;
+    overflow: visible;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    z-index: 100;
   }
 
   .sidebar-nav {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 30px;
+    width: 100%;
+    gap: clamp(4px, 1vh, 10px);
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: visible;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .sidebar-logo {
-    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-bottom: 8px;
+    gap: 0;
+    flex-shrink: 0;
   }
 
-  /* En escritorio volvemos a formato original (solo ícono central) */
-  .sidebar-link, .sidebar-btn {
+  .logo-icon {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto;
+    border-radius: 10px;
+  }
+
+  /* Centrado perfecto de los iconos */
+  .tooltip-container {
+    width: 100%;
+    display: flex;
     justify-content: center;
-    padding: 8px;
+    align-items: center;
+    position: relative;
+  }
+
+  .sidebar-link, .sidebar-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: transparent;
+    border-radius: 10px;
+    gap: 0;
+    flex-shrink: 0;
   }
 
   .sidebar-link.active {
-    background: transparent;
+    background: var(--accent-bg);
+    color: var(--accent-primary);
+  }
+
+  .sidebar-link:hover, .sidebar-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
   }
 
   .sidebar-label {
-    display: none; /* Ocultamos el texto para dejar solo el ícono */
+    display: none;
+  }
+
+  .sidebar-bottom {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    margin-top: auto;
+    flex-shrink: 0;
   }
 
   /* ── Tooltips para Escritorio ── */
   .tooltip-text {
     display: block;
     position: absolute;
-    left: 100%;       
-    margin-left: 20px; 
+    left: calc(100% + 14px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-8px);
     padding: 6px 12px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-    color: var(--text-main);
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
     border-radius: 8px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     white-space: nowrap;
     opacity: 0;
     visibility: hidden;
-    transform: translateX(-10px);
-    transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
-    z-index: 100;
-    pointer-events: none; 
-    box-shadow: var(--card-shadow);
+    transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
+    z-index: 99999;
+    pointer-events: none;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
   }
 
   .tooltip-text::before {
@@ -210,12 +283,12 @@
     transform: translateY(-50%);
     border-width: 5px;
     border-style: solid;
-    border-color: transparent var(--glass-border) transparent transparent;
+    border-color: transparent #1e293b transparent transparent;
   }
 
   .tooltip-container:hover .tooltip-text {
     opacity: 1;
     visibility: visible;
-    transform: translateX(0);
+    transform: translateY(-50%) translateX(0);
   }
 }

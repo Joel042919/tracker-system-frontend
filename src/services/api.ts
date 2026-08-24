@@ -3,7 +3,9 @@ import type {
   Area, Proyecto, Metrica, ProyectoMetrica, RegistroEvaluacion,
   Reward, PuntosUsados, Task, PuntosGanados, Formulario,
   Macros, DayliTrack, FoodLog,
-  ProyectoHabito, ProyectoTarea, RegistroHabito, RegistroTarea
+  ProyectoHabito, ProyectoTarea, RegistroHabito, RegistroTarea,
+  Medio, CategoriaFinanzas, Movimiento,
+  EgresoFijo, PagoProgramado, Presupuesto, AlertaPago
 } from '../db/localDb';
 
 const API_BASE = import.meta.env.VITE_API_URL as string;
@@ -982,4 +984,445 @@ export async function updateRegistroTarea(id: number, input: any) {
 
 export async function deleteRegistroTarea(id: number) {
   await deleteLocal(localDB.registro_tareas, id, `/api/registro-tareas/${id}`);
+}
+
+// ─── Medios & Saldos ──────────────────────────────────────
+
+export async function getMedios(): Promise<Medio[]> {
+  if (!navigator.onLine) return localDB.medios.toArray();
+  try {
+    const data = await apiFetch('/api/medios');
+    return await safeBulkReplace(localDB.medios, data, (item) => toLocal(item, true, {
+      id: item.id,
+      estado: boolToNum(item.estado ?? true),
+      saldo_actual: Number(item.saldo_actual || 0)
+    }));
+  } catch {
+    return localDB.medios.toArray();
+  }
+}
+
+export async function getMedio(id: string): Promise<Medio | undefined> {
+  if (!navigator.onLine) return localDB.medios.get(id);
+  try {
+    const data = await apiFetch(`/api/medios/${id}`);
+    const localData = toLocal(data, true, {
+      id: data.id,
+      estado: boolToNum(data.estado ?? true),
+      saldo_actual: Number(data.saldo_actual || 0)
+    });
+    await localDB.medios.put(localData);
+    return localData as Medio;
+  } catch {
+    return localDB.medios.get(id);
+  }
+}
+
+export async function createMedio(input: any) {
+  const newId = crypto.randomUUID();
+  const saldoInicial = Number(input.saldo_inicial || 0);
+
+  const res = await addToLocal(localDB.medios, { ...input, id: newId }, '/api/medios', (data) => ({
+    ...data,
+    id: data.id || newId,
+    estado: boolToNum(true),
+    saldo_actual: saldoInicial,
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+
+  // Inicializar saldo en tabla saldos_actuales
+  await localDB.saldos_actuales.put({
+    id: crypto.randomUUID(),
+    medio_id: typeof res === 'string' ? res : newId,
+    saldo: saldoInicial,
+    _sincronizado: 1,
+    _ultimaModificacion: new Date().toISOString()
+  });
+
+  return res;
+}
+
+export async function updateMedio(id: string, input: any) {
+  await updateLocal(localDB.medios, id, input, `/api/medios/${id}`, (data) => ({
+    ...data,
+    estado: typeof data.estado === 'boolean' ? boolToNum(data.estado) : data.estado
+  }));
+}
+
+export async function setSaldoMedio(id: string, saldo: number) {
+  const medio = await localDB.medios.get(id);
+  if (medio) {
+    await localDB.medios.update(id, { saldo_actual: saldo });
+  }
+  const saldoRec = await localDB.saldos_actuales.filter(s => s.medio_id === id).first();
+  if (saldoRec) {
+    await localDB.saldos_actuales.update(saldoRec.id, { saldo });
+  } else {
+    await localDB.saldos_actuales.put({ id: crypto.randomUUID(), medio_id: id, saldo, _sincronizado: 1 });
+  }
+
+  if (navigator.onLine) {
+    try {
+      await apiFetch(`/api/medios/${id}/saldo`, {
+        method: 'PUT',
+        body: JSON.stringify({ saldo })
+      });
+    } catch {
+      await localDB.pendingSync.add({
+        type: 'UPDATE',
+        endpoint: `/api/medios/${id}/saldo`,
+        payload: { saldo },
+        timestamp: new Date().toISOString()
+      });
+    }
+  } else {
+    await localDB.pendingSync.add({
+      type: 'UPDATE',
+      endpoint: `/api/medios/${id}/saldo`,
+      payload: { saldo },
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+export async function deleteMedio(id: string) {
+  await deleteLocal(localDB.medios, id, `/api/medios/${id}`);
+}
+
+// ─── Categorias Finanzas ─────────────────────────────────
+
+export async function getCategoriasFinanzas(): Promise<CategoriaFinanzas[]> {
+  if (!navigator.onLine) return localDB.categorias_finanzas.toArray();
+  try {
+    const data = await apiFetch('/api/categorias');
+    return await safeBulkReplace(localDB.categorias_finanzas, data, (item) => toLocal(item, true, { id: item.id }));
+  } catch {
+    return localDB.categorias_finanzas.toArray();
+  }
+}
+
+export async function createCategoriaFinanzas(input: any) {
+  const newId = crypto.randomUUID();
+  return addToLocal(localDB.categorias_finanzas, { ...input, id: newId }, '/api/categorias', (data) => ({
+    ...data,
+    id: data.id || newId,
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateCategoriaFinanzas(id: string, input: any) {
+  await updateLocal(localDB.categorias_finanzas, id, input, `/api/categorias/${id}`, (data) => data);
+}
+
+export async function deleteCategoriaFinanzas(id: string) {
+  await deleteLocal(localDB.categorias_finanzas, id, `/api/categorias/${id}`);
+}
+
+// ─── Movimientos (Con ajuste de saldo reactivo) ───────────
+
+export async function getMovimientos(): Promise<Movimiento[]> {
+  if (!navigator.onLine) return localDB.movimientos.toArray();
+  try {
+    const data = await apiFetch('/api/movimientos');
+    return await safeBulkReplace(localDB.movimientos, data, (item) => toLocal(item, true, {
+      id: item.id,
+      monto: Number(item.monto || 0)
+    }));
+  } catch {
+    return localDB.movimientos.toArray();
+  }
+}
+
+export async function createMovimiento(input: any) {
+  const newId = crypto.randomUUID();
+  const monto = Number(input.monto);
+  const tipo = input.tipo as 'I' | 'E';
+  const medioId = input.medio_id;
+
+  // Ajuste optimista del saldo local
+  const medio = await localDB.medios.get(medioId);
+  if (medio) {
+    const delta = tipo === 'I' ? monto : -monto;
+    const nuevoSaldo = (medio.saldo_actual || 0) + delta;
+    await localDB.medios.update(medioId, { saldo_actual: nuevoSaldo });
+  }
+
+  return addToLocal(localDB.movimientos, { ...input, id: newId }, '/api/movimientos', (data) => ({
+    ...data,
+    id: data.id || newId,
+    monto,
+    fecha_movimiento: data.fecha_movimiento || new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateMovimiento(id: string, input: any) {
+  const oldMov = await localDB.movimientos.get(id);
+  const newMonto = Number(input.monto);
+  const newTipo = input.tipo as 'I' | 'E';
+  const newMedioId = input.medio_id;
+
+  if (oldMov) {
+    // 1. Revertir impacto anterior
+    const oldMedio = await localDB.medios.get(oldMov.medio_id);
+    if (oldMedio) {
+      const revertDelta = oldMov.tipo === 'I' ? -oldMov.monto : oldMov.monto;
+      await localDB.medios.update(oldMov.medio_id, { saldo_actual: (oldMedio.saldo_actual || 0) + revertDelta });
+    }
+    // 2. Aplicar nuevo impacto
+    const targetMedio = await localDB.medios.get(newMedioId);
+    if (targetMedio) {
+      const applyDelta = newTipo === 'I' ? newMonto : -newMonto;
+      await localDB.medios.update(newMedioId, { saldo_actual: (targetMedio.saldo_actual || 0) + applyDelta });
+    }
+  }
+
+  await updateLocal(localDB.movimientos, id, input, `/api/movimientos/${id}`, (data) => ({
+    ...data,
+    monto: newMonto
+  }));
+}
+
+export async function deleteMovimiento(id: string) {
+  const oldMov = await localDB.movimientos.get(id);
+  if (oldMov) {
+    const medio = await localDB.medios.get(oldMov.medio_id);
+    if (medio) {
+      const revertDelta = oldMov.tipo === 'I' ? -oldMov.monto : oldMov.monto;
+      await localDB.medios.update(oldMov.medio_id, { saldo_actual: (medio.saldo_actual || 0) + revertDelta });
+    }
+  }
+  await deleteLocal(localDB.movimientos, id, `/api/movimientos/${id}`);
+}
+
+// ─── Egresos Fijos ────────────────────────────────────────
+
+export async function getEgresosFijos(): Promise<EgresoFijo[]> {
+  if (!navigator.onLine) return localDB.egresos_fijos.toArray();
+  try {
+    const data = await apiFetch('/api/egresos-fijos');
+    return await safeBulkReplace(localDB.egresos_fijos, data, (item) => toLocal(item, true, {
+      id: item.id,
+      activo: boolToNum(item.activo ?? true),
+      monto: Number(item.monto || 0)
+    }));
+  } catch {
+    return localDB.egresos_fijos.toArray();
+  }
+}
+
+export async function createEgresoFijo(input: any) {
+  const newId = crypto.randomUUID();
+  const processed = {
+    ...input,
+    id: newId,
+    monto: Number(input.monto),
+    programacion_pago: typeof input.programacion_pago === 'string' ? input.programacion_pago : JSON.stringify(input.programacion_pago),
+    recordatorio_dias_antes: Number(input.recordatorio_dias_antes || 3),
+  };
+
+  const res = await addToLocal(localDB.egresos_fijos, processed, '/api/egresos-fijos', (data) => ({
+    ...data,
+    id: data.id || newId,
+    activo: boolToNum(true),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+
+  // Refrescar pagos programados y alertas en background
+  if (navigator.onLine) {
+    getPagosProgramados().catch(console.error);
+    getAlertasPago().catch(console.error);
+  }
+
+  return res;
+}
+
+export async function updateEgresoFijo(id: string, input: any) {
+  const processed = {
+    ...input,
+    monto: input.monto ? Number(input.monto) : undefined,
+    programacion_pago: input.programacion_pago ? (typeof input.programacion_pago === 'string' ? input.programacion_pago : JSON.stringify(input.programacion_pago)) : undefined,
+  };
+  await updateLocal(localDB.egresos_fijos, id, processed, `/api/egresos-fijos/${id}`, (data) => ({
+    ...data,
+    activo: typeof data.activo === 'boolean' ? boolToNum(data.activo) : data.activo
+  }));
+}
+
+export async function deleteEgresoFijo(id: string) {
+  await deleteLocal(localDB.egresos_fijos, id, `/api/egresos-fijos/${id}`);
+}
+
+// ─── Pagos Programados ────────────────────────────────────
+
+export async function getPagosProgramados(): Promise<PagoProgramado[]> {
+  if (!navigator.onLine) return localDB.pagos_programados.toArray();
+  try {
+    const data = await apiFetch('/api/pagos-programados');
+    return await safeBulkReplace(localDB.pagos_programados, data, (item) => toLocal(item, true, {
+      id: item.id,
+      monto_esperado: Number(item.monto_esperado || 0)
+    }));
+  } catch {
+    return localDB.pagos_programados.toArray();
+  }
+}
+
+export async function pagarPagoProgramado(pagoId: string, payload: { medio_id: string; monto_real: number; notas?: string }) {
+  const pago = await localDB.pagos_programados.get(pagoId);
+  const monto = Number(payload.monto_real);
+
+  // 1. Actualizar estado local del pago programado
+  if (pago) {
+    await localDB.pagos_programados.update(pagoId, {
+      estado: 'pagado',
+      fecha_pago: new Date().toISOString(),
+      medio_id: payload.medio_id,
+      notas: payload.notas || null
+    });
+  }
+
+  // 2. Crear movimiento local de egreso
+  const egresoFijo = pago ? await localDB.egresos_fijos.get(pago.egreso_fijo_id) : null;
+  const movId = crypto.randomUUID();
+  const desc = egresoFijo ? `Pago programado: ${egresoFijo.razon}` : 'Pago programado';
+
+  await createMovimiento({
+    id: movId,
+    medio_id: payload.medio_id,
+    categoria_id: egresoFijo?.categoria_id || null,
+    tipo: 'E',
+    fecha_movimiento: new Date().toISOString(),
+    descripcion: payload.notas ? `${desc} - ${payload.notas}` : desc,
+    monto,
+    egreso_fijo_id: pago?.egreso_fijo_id || null
+  });
+
+  // 3. Marcar alerta asociada como leída
+  const alerta = await localDB.alertas_pago.filter(a => a.pago_programado_id === pagoId).first();
+  if (alerta) {
+    await localDB.alertas_pago.update(alerta.id, { leida: 1 });
+  }
+
+  // 4. Mandar al servidor si estamos online
+  if (navigator.onLine) {
+    try {
+      await apiFetch(`/api/pagos-programados/${pagoId}/pagar`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    } catch {
+      await localDB.pendingSync.add({
+        type: 'UPDATE',
+        endpoint: `/api/pagos-programados/${pagoId}/pagar`,
+        payload,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } else {
+    await localDB.pendingSync.add({
+      type: 'UPDATE',
+      endpoint: `/api/pagos-programados/${pagoId}/pagar`,
+      payload,
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+export async function deletePagoProgramado(id: string) {
+  await deleteLocal(localDB.pagos_programados, id, `/api/pagos-programados/${id}`);
+}
+
+// ─── Presupuestos ─────────────────────────────────────────
+
+export async function getPresupuestos(): Promise<Presupuesto[]> {
+  if (!navigator.onLine) return localDB.presupuestos.toArray();
+  try {
+    const data = await apiFetch('/api/presupuestos');
+    return await safeBulkReplace(localDB.presupuestos, data, (item) => toLocal(item, true, {
+      id: item.id,
+      activo: boolToNum(item.activo ?? true),
+      monto_limite: Number(item.monto_limite || 0)
+    }));
+  } catch {
+    return localDB.presupuestos.toArray();
+  }
+}
+
+export async function createPresupuesto(input: any) {
+  const newId = crypto.randomUUID();
+  return addToLocal(localDB.presupuestos, { ...input, id: newId }, '/api/presupuestos', (data) => ({
+    ...data,
+    id: data.id || newId,
+    monto_limite: Number(data.monto_limite),
+    activo: boolToNum(true),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updatePresupuesto(id: string, input: any) {
+  await updateLocal(localDB.presupuestos, id, input, `/api/presupuestos/${id}`, (data) => ({
+    ...data,
+    monto_limite: input.monto_limite ? Number(input.monto_limite) : data.monto_limite,
+    activo: typeof data.activo === 'boolean' ? boolToNum(data.activo) : data.activo
+  }));
+}
+
+export async function deletePresupuesto(id: string) {
+  await deleteLocal(localDB.presupuestos, id, `/api/presupuestos/${id}`);
+}
+
+// ─── Alertas de Pago ──────────────────────────────────────
+
+export async function getAlertasPago(): Promise<AlertaPago[]> {
+  if (!navigator.onLine) return localDB.alertas_pago.toArray();
+  try {
+    const data = await apiFetch('/api/alertas-pago');
+    return await safeBulkReplace(localDB.alertas_pago, data, (item) => toLocal(item, true, {
+      id: item.id,
+      leida: boolToNum(item.leida ?? false)
+    }));
+  } catch {
+    return localDB.alertas_pago.toArray();
+  }
+}
+
+export async function marcarAlertaLeida(id: string, leida: boolean) {
+  await localDB.alertas_pago.update(id, { leida: boolToNum(leida) });
+
+  if (navigator.onLine) {
+    try {
+      await apiFetch(`/api/alertas-pago/${id}/leida`, {
+        method: 'PUT',
+        body: JSON.stringify({ leida })
+      });
+    } catch {
+      await localDB.pendingSync.add({
+        type: 'UPDATE',
+        endpoint: `/api/alertas-pago/${id}/leida`,
+        payload: { leida },
+        timestamp: new Date().toISOString()
+      });
+    }
+  } else {
+    await localDB.pendingSync.add({
+      type: 'UPDATE',
+      endpoint: `/api/alertas-pago/${id}/leida`,
+      payload: { leida },
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
+export async function deleteAlertaPago(id: string) {
+  await deleteLocal(localDB.alertas_pago, id, `/api/alertas-pago/${id}`);
 }

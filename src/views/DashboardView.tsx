@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDB, type ProyectoHabito, type ProyectoTarea } from '../db/localDb';
+import { localDB, type ProyectoHabito, type ProyectoTarea, type PagoProgramado } from '../db/localDb';
 import { SyncIndicator } from '../components/SyncIndicator';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
@@ -21,11 +21,21 @@ import {
   createRegistroTarea,
   updateRegistroTarea,
   updateProyectoHabito,
-  createPuntosGanados
+  createPuntosGanados,
+  getMedios,
+  getMovimientos,
+  getCategoriasFinanzas,
+  getAlertasPago,
+  marcarAlertaLeida,
+  getPresupuestos,
+  getPagosProgramados,
+  pagarPagoProgramado,
+  getEgresosFijos
 } from '../services/api';
 import { 
   Flame, ChevronDown, ChevronUp, Check, Play, 
-  Clock, CheckCircle2, Award
+  Clock, CheckCircle2, Award, Wallet, ArrowDownRight,
+  ArrowUpRight, Bell, CreditCard, Banknote, PieChart, CheckCheck, X, AlertCircle
 } from 'lucide-react';
 import './DashboardView.css';
 
@@ -50,7 +60,14 @@ export function DashboardView() {
         getProyectoHabitos(),
         getProyectoTareas(),
         getRegistroHabitos(),
-        getRegistroTareas()
+        getRegistroTareas(),
+        getMedios(),
+        getMovimientos(),
+        getCategoriasFinanzas(),
+        getAlertasPago(),
+        getPresupuestos(),
+        getPagosProgramados(),
+        getEgresosFijos()
       ]).catch(console.error);
     }
   }, []);
@@ -65,6 +82,15 @@ export function DashboardView() {
   const registroHabitos = useLiveQuery(() => localDB.registro_habitos.toArray(), []) || [];
   const registroTareas = useLiveQuery(() => localDB.registro_tareas.toArray(), []) || [];
 
+  // Data for Finanzas
+  const medios = useLiveQuery(() => localDB.medios.filter(m => m.estado === 1).toArray(), []) || [];
+  const movimientos = useLiveQuery(() => localDB.movimientos.toArray(), []) || [];
+  const categoriasFinanzas = useLiveQuery(() => localDB.categorias_finanzas.toArray(), []) || [];
+  const alertasPago = useLiveQuery(() => localDB.alertas_pago.filter(a => a.leida === 0).toArray(), []) || [];
+  const presupuestos = useLiveQuery(() => localDB.presupuestos.filter(p => p.activo === 1).toArray(), []) || [];
+  const pagosProgramados = useLiveQuery(() => localDB.pagos_programados.toArray(), []) || [];
+  const egresosFijos = useLiveQuery(() => localDB.egresos_fijos.toArray(), []) || [];
+
   const [expandedHabits, setExpandedHabits] = useState<Record<number, boolean>>({});
 
   const toggleExpand = (habId: number) => {
@@ -76,6 +102,108 @@ export function DashboardView() {
   const todayDayName = dayNames[new Date().getDay()];
   const todayStr = new Date().toLocaleDateString('en-CA'); // "YYYY-MM-DD"
 
+  // ── Finanzas: Cálculos de Saldo y Periodo ──
+  const saldoTotalFinanzas = useMemo(() => {
+    return medios.reduce((acc, m) => acc + (m.saldo_actual || 0), 0);
+  }, [medios]);
+
+  const [periodoFinanzas, setPeriodoFinanzas] = useState<'hoy' | 'semana' | 'mes'>('mes');
+
+  const movimientosFiltradosPeriodo = useMemo(() => {
+    const now = new Date();
+    const currDate = new Date().toISOString().slice(0, 10);
+    const currMonth = currDate.slice(0, 7);
+
+    // Inicio de la semana (Lunes)
+    const day = now.getDay();
+    const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(now.setDate(diffToMonday));
+    const mondayStr = monday.toISOString().slice(0, 10);
+
+    return movimientos.filter(m => {
+      const fecha = (m.fecha_movimiento || '').slice(0, 10);
+      if (periodoFinanzas === 'hoy') return fecha === currDate;
+      if (periodoFinanzas === 'semana') return fecha >= mondayStr && fecha <= currDate;
+      if (periodoFinanzas === 'mes') return fecha.startsWith(currMonth);
+      return true;
+    });
+  }, [movimientos, periodoFinanzas]);
+
+  const totalIngresosPeriodo = useMemo(() => {
+    return movimientosFiltradosPeriodo
+      .filter(m => m.tipo === 'I')
+      .reduce((sum, m) => sum + m.monto, 0);
+  }, [movimientosFiltradosPeriodo]);
+
+  const totalEgresosPeriodo = useMemo(() => {
+    return movimientosFiltradosPeriodo
+      .filter(m => m.tipo === 'E')
+      .reduce((sum, m) => sum + m.monto, 0);
+  }, [movimientosFiltradosPeriodo]);
+
+  // Desglose de egresos por categoría en el periodo
+  const egresosPorCategoria = useMemo(() => {
+    const catMap = new Map<string, number>();
+    movimientosFiltradosPeriodo
+      .filter(m => m.tipo === 'E')
+      .forEach(m => {
+        const cat = categoriasFinanzas.find(c => c.id === m.categoria_id)?.categoria || 'Sin categoría';
+        catMap.set(cat, (catMap.get(cat) || 0) + m.monto);
+      });
+    return Array.from(catMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+  }, [movimientosFiltradosPeriodo, categoriasFinanzas]);
+
+  // Desglose de egresos por medio en el periodo
+  const egresosPorMedio = useMemo(() => {
+    const medMap = new Map<string, number>();
+    movimientosFiltradosPeriodo
+      .filter(m => m.tipo === 'E')
+      .forEach(m => {
+        const med = medios.find(med => med.id === m.medio_id)?.medio || 'Otro';
+        medMap.set(med, (medMap.get(med) || 0) + m.monto);
+      });
+    return Array.from(medMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+  }, [movimientosFiltradosPeriodo, medios]);
+
+  // Notificaciones PWA
+  const triggerNotificationPrompt = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted' && alertasPago.length > 0) {
+        new Notification('Alertas de Pago - TrackerApp', {
+          body: `Tienes ${alertasPago.length} alerta(s) de pago pendiente(s).`,
+          icon: '/pwa-192x192.png'
+        });
+      }
+    }
+  };
+
+  // Modal para Pagar desde Alerta
+  const [selectedPagoForPay, setSelectedPagoForPay] = useState<PagoProgramado | null>(null);
+  const [payMedioId, setPayMedioId] = useState('');
+  const [payMontoReal, setPayMontoReal] = useState('');
+
+  const openPagarFromAlerta = (pagoId: string) => {
+    const pago = pagosProgramados.find(p => p.id === pagoId);
+    if (pago) {
+      setSelectedPagoForPay(pago);
+      setPayMedioId(medios[0]?.id || '');
+      setPayMontoReal(String(pago.monto_esperado));
+    }
+  };
+
+  const handleExecutePaymentFromDashboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPagoForPay || !payMedioId || Number(payMontoReal) <= 0) return;
+
+    await pagarPagoProgramado(selectedPagoForPay.id, {
+      medio_id: payMedioId,
+      monto_real: Number(payMontoReal)
+    });
+
+    setSelectedPagoForPay(null);
+  };
+
   // Filtrar hábitos programados para hoy (o todos los hábitos si ninguno tiene el día asignado)
   const habitosDeHoy = useMemo(() => {
     return habitos.map(h => {
@@ -86,7 +214,7 @@ export function DashboardView() {
         dias = h.dias_semana as any;
       }
       
-      const tocaHoy = dias[todayDayName] !== false; // true si está marcado o por defecto
+      const tocaHoy = dias[todayDayName] !== false;
       const proyecto = proyectos.find(p => p.id === h.id_proyecto);
       const tareas = todasTareas.filter(t => t.id_proyecto_habito === h.id).sort((a, b) => a.orden - b.orden);
       
@@ -121,7 +249,6 @@ export function DashboardView() {
   const handleToggleTask = async (habito: ProyectoHabito, tarea: ProyectoTarea, currentDone: boolean) => {
     if (!habito.id || !tarea.id) return;
 
-    // 1. Buscar o crear el registro_habito de hoy
     let regHab = registroHabitos.find(r => r.id_proyecto_habito === habito.id && r.fecha === todayStr);
     let regHabId = regHab?.id;
 
@@ -138,7 +265,6 @@ export function DashboardView() {
 
     if (!regHabId) return;
 
-    // 2. Crear o actualizar registro_tarea
     const newDone = currentDone ? 0 : 1;
     const existingRT = registroTareas.find(rt => rt.id_registro_habito === regHabId && rt.id_proyecto_tarea === tarea.id);
 
@@ -158,7 +284,6 @@ export function DashboardView() {
       });
     }
 
-    // 3. Evaluar completitud total del hábito
     const habitTareas = todasTareas.filter(t => t.id_proyecto_habito === habito.id);
     const updatedRTs = await localDB.registro_tareas.filter(rt => rt.id_registro_habito === regHabId).toArray();
     const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1]));
@@ -325,6 +450,69 @@ export function DashboardView() {
         </div>
       </header>
 
+      {/* ── ALERTAS DE PAGO / NOTIFICACIONES ── */}
+      {alertasPago.length > 0 && (
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ fontSize: '15px', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+              <Bell size={16} /> Alertas de Pago Pendientes ({alertasPago.length})
+            </h3>
+            <button
+              className="action-btn"
+              style={{ fontSize: '12px', padding: '4px 10px' }}
+              onClick={triggerNotificationPrompt}
+            >
+              🔔 Activar Notificaciones PWA
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {alertasPago.map(a => {
+              const pago = pagosProgramados.find(p => p.id === a.pago_programado_id);
+              const egreso = pago ? egresosFijos.find(ef => ef.id === pago.egreso_fijo_id) : null;
+
+              return (
+                <div key={a.id} className="alerta-box-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                    <AlertCircle size={20} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>
+                        {a.mensaje}
+                      </div>
+                      {egreso && (
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          Concepto: <strong>{egreso.razon}</strong> • Monto: <strong>S/ {pago?.monto_esperado.toFixed(2)}</strong>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {pago && pago.estado !== 'pagado' && (
+                      <button
+                        className="btn-primary"
+                        style={{ padding: '6px 12px', fontSize: '12px', background: '#f59e0b', color: '#000', borderColor: '#f59e0b' }}
+                        onClick={() => openPagarFromAlerta(pago.id)}
+                      >
+                        Pagar
+                      </button>
+                    )}
+                    <button
+                      className="btn-icon"
+                      title="Marcar como leída"
+                      style={{ padding: '6px' }}
+                      onClick={() => marcarAlertaLeida(a.id, true)}
+                    >
+                      <CheckCheck size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ── MÉTRICAS PRINCIPALES ── */}
       <section className="stats-grid">
         <div className="glass-card stat-card">
@@ -340,9 +528,175 @@ export function DashboardView() {
           <span className="stat-label">Puntos Totales (Disponibles)</span>
         </div>
         <div className="glass-card stat-card">
-          <span className="stat-number" style={{ color: '#ef4444' }}>-{puntosHoy.totalGastados}</span>
-          <span className="stat-label">Puntos Gastados</span>
+          <span className="stat-number" style={{ color: '#ef4444' }}>{puntosHoy.totalGastados}</span>
+          <span className="stat-label">Puntos Gastados Hoy</span>
         </div>
+        <div className="glass-card stat-card">
+          <span className="stat-number" style={{ color: 'var(--accent-primary)' }}>
+            S/ {saldoTotalFinanzas.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+          <span className="stat-label">Saldo Total en Cuentas</span>
+        </div>
+      </section>
+
+      {/* ── SECCIÓN FINANZAS (SALDOS & RESUMEN DE MOVIMIENTOS) ── */}
+      <section className="finanzas-dashboard-section">
+        {/* Fila de Saldos por Medio */}
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Wallet size={18} style={{ color: 'var(--accent-primary)' }} /> Saldo por Cuenta / Medio
+            </h3>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{medios.length} cuentas registradas</span>
+          </div>
+
+          <div className="saldos-scroll-container">
+            {medios.length === 0 ? (
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>No hay cuentas registradas aún. Ve a <strong>Finanzas</strong> para agregar cuentas.</p>
+            ) : (
+              medios.map(m => (
+                <div key={m.id} className="saldo-card-item">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {m.tipo_medio === 'efectivo' ? <Banknote size={14} /> : <CreditCard size={14} />}
+                    <span style={{ fontWeight: 500, color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{m.medio}</span>
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-main)' }}>
+                    S/ {(m.saldo_actual || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                    {m.banco || m.tipo_medio.replace('_', ' ')}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Resumen de Movimientos (Hoy / Semana / Mes) */}
+        <div className="glass-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: 'var(--text-main)' }}>
+              Resumen de Ingresos & Egresos
+            </h3>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {(['hoy', 'semana', 'mes'] as const).map(p => (
+                <button
+                  key={p}
+                  className={`timeframe-pill-btn ${periodoFinanzas === p ? 'active' : ''}`}
+                  onClick={() => setPeriodoFinanzas(p)}
+                >
+                  {p === 'hoy' ? 'Hoy' : p === 'semana' ? 'Esta Semana' : 'Este Mes'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+              <span style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowDownRight size={14} /> Total Ingresos ({periodoFinanzas})
+              </span>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981', marginTop: '4px' }}>
+                +S/ {totalIngresosPeriodo.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              <span style={{ fontSize: '12px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ArrowUpRight size={14} /> Total Egresos ({periodoFinanzas})
+              </span>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#ef4444', marginTop: '4px' }}>
+                -S/ {totalEgresosPeriodo.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Balance Neto ({periodoFinanzas})</span>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: totalIngresosPeriodo - totalEgresosPeriodo >= 0 ? '#10b981' : '#ef4444', marginTop: '4px' }}>
+                S/ {(totalIngresosPeriodo - totalEgresosPeriodo).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Desgloses por Categoría y Medio */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+            <div>
+              <h4 style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Egresos por Categoría</h4>
+              {egresosPorCategoria.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin egresos en este periodo.</span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {egresosPorCategoria.map((cat, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-main)' }}>{cat.nombre}</span>
+                      <strong style={{ color: '#ef4444' }}>S/ {cat.total.toFixed(2)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h4 style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>Egresos por Medio de Pago</h4>
+              {egresosPorMedio.length === 0 ? (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin egresos en este periodo.</span>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {egresosPorMedio.map((med, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-main)' }}>{med.nombre}</span>
+                      <strong style={{ color: '#ef4444' }}>S/ {med.total.toFixed(2)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Seguimiento de Presupuestos */}
+        {presupuestos.length > 0 && (
+          <div className="glass-card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <PieChart size={18} style={{ color: 'var(--accent-primary)' }} /> Seguimiento de Presupuestos
+              </h3>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+              {presupuestos.map(p => {
+                const cat = categoriasFinanzas.find(c => c.id === p.categoria_id);
+                const currMonthStr = new Date().toISOString().slice(0, 7);
+                const gastado = movimientos
+                  .filter(m => m.tipo === 'E' && m.categoria_id === p.categoria_id && (m.fecha_movimiento || '').startsWith(currMonthStr))
+                  .reduce((sum, m) => sum + m.monto, 0);
+
+                const porcentaje = Math.min(Math.round((gastado / p.monto_limite) * 100), 100);
+                let barColor = '#10b981';
+                if (porcentaje > 90) barColor = '#ef4444';
+                else if (porcentaje > 70) barColor = '#f59e0b';
+
+                return (
+                  <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-main)' }}>{p.nombre}</span>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: barColor }}>{porcentaje}%</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {cat ? cat.categoria : 'General'} • S/ {gastado.toFixed(2)} de S/ {p.monto_limite.toFixed(2)}
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden', margin: '8px 0 4px 0' }}>
+                      <div style={{ width: `${porcentaje}%`, height: '100%', background: barColor, borderRadius: '4px', transition: 'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'right' }}>
+                      Restante: S/ {Math.max(p.monto_limite - gastado, 0).toFixed(2)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── SECCIÓN MICRO HABITS (TRACKING DIARIO) ── */}
@@ -441,17 +795,14 @@ export function DashboardView() {
 
                             return (
                               <div key={tarea.id} className="habit-timeline-item">
-                                {/* Línea vertical conectora */}
                                 {idx < tareas.length - 1 && (
                                   <div className={`timeline-connector ${completado && isNextDone ? 'completed' : ''}`} />
                                 )}
 
-                                {/* Tiempo estimado */}
                                 <div className="timeline-time">
                                   {tarea.tiempo_estimado_minutos} min
                                 </div>
 
-                                {/* Nodo circular */}
                                 <div
                                   className={`timeline-node ${completado ? 'done' : ''}`}
                                   onClick={() => handleToggleTask(habito, tarea, completado)}
@@ -459,7 +810,6 @@ export function DashboardView() {
                                   {completado && <Check size={13} />}
                                 </div>
 
-                                {/* Contenido de la tarea */}
                                 <div className="timeline-content">
                                   <div>
                                     <div className={`timeline-title ${completado ? 'done' : ''}`}>
@@ -627,6 +977,56 @@ export function DashboardView() {
         </div>
 
       </section>
+
+      {/* ── MODAL: PAGAR CUOTA DESDE ALERTAS ── */}
+      {selectedPagoForPay && (
+        <div className="modal-overlay" onClick={() => setSelectedPagoForPay(null)}>
+          <div className="glass-card modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Registrar Pago de Cuota</h2>
+              <button className="action-btn" onClick={() => setSelectedPagoForPay(null)}><X size={22} /></button>
+            </div>
+            <form onSubmit={handleExecutePaymentFromDashboard} className="modal-body">
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                Fecha programada: <strong>{selectedPagoForPay.fecha_programada}</strong>
+              </p>
+
+              <div className="form-group">
+                <label>Monto Real Pagado (S/) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  required
+                  value={payMontoReal}
+                  onChange={e => setPayMontoReal(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Cuenta / Medio con que pagaste *</label>
+                <select
+                  className="glass-select"
+                  required
+                  value={payMedioId}
+                  onChange={e => setPayMedioId(e.target.value)}
+                >
+                  {medios.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.medio} (Saldo: S/ {(m.saldo_actual || 0).toFixed(2)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="action-btn" onClick={() => setSelectedPagoForPay(null)}>Cancelar</button>
+                <button type="submit" className="btn-primary">Confirmar Pago</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
