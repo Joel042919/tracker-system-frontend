@@ -2,7 +2,8 @@ import { localDB, boolToNum, numToBool } from '../db/localDb';
 import type {
   Area, Proyecto, Metrica, ProyectoMetrica, RegistroEvaluacion,
   Reward, PuntosUsados, Task, PuntosGanados, Formulario,
-  Macros, DayliTrack, FoodLog
+  Macros, DayliTrack, FoodLog,
+  ProyectoHabito, ProyectoTarea, RegistroHabito, RegistroTarea
 } from '../db/localDb';
 
 const API_BASE = import.meta.env.VITE_API_URL as string;
@@ -819,4 +820,166 @@ export async function updateFoodLog(idFoodLog: string, input: any) {
 
 export async function deleteFoodLog(idFoodLog: string) {
   await deleteLocal(localDB.foodLogs, idFoodLog, `/api/food-logs/${idFoodLog}`);
+}
+
+// ─── ProyectoHabito ───────────────────────────────────────
+
+export async function getProyectoHabitos(): Promise<ProyectoHabito[]> {
+  if (!navigator.onLine) return localDB.proyecto_habitos.toArray();
+  try {
+    const data = await apiFetch('/api/proyecto-habitos');
+    return await safeBulkReplace(localDB.proyecto_habitos, data);
+  } catch {
+    return localDB.proyecto_habitos.toArray();
+  }
+}
+
+export async function getProyectoHabito(id: number): Promise<ProyectoHabito | undefined> {
+  if (!navigator.onLine) return localDB.proyecto_habitos.get(id);
+  try {
+    const data = await apiFetch(`/api/proyecto-habitos/${id}`);
+    const localData = toLocal(data, true);
+    await localDB.proyecto_habitos.put(localData);
+    return localData as ProyectoHabito;
+  } catch {
+    return localDB.proyecto_habitos.get(id);
+  }
+}
+
+export async function createProyectoHabito(input: any) {
+  const processed = {
+    ...input,
+    dias_semana: typeof input.dias_semana === 'string' ? input.dias_semana : JSON.stringify(input.dias_semana),
+  };
+  return addToLocal(localDB.proyecto_habitos, processed, '/api/proyecto-habitos', (data) => ({
+    ...data,
+    record_streak: 0,
+    best_streak: 0,
+    activo: boolToNum(true),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateProyectoHabito(id: number, input: any) {
+  const processed = {
+    ...input,
+    dias_semana: input.dias_semana ? (typeof input.dias_semana === 'string' ? input.dias_semana : JSON.stringify(input.dias_semana)) : undefined,
+  };
+  await updateLocal(localDB.proyecto_habitos, id, processed, `/api/proyecto-habitos/${id}`, (data) => data);
+}
+
+export async function deleteProyectoHabito(id: number) {
+  await deleteLocal(localDB.proyecto_habitos, id, `/api/proyecto-habitos/${id}`);
+}
+
+// ─── ProyectoTarea ────────────────────────────────────────
+
+export async function getProyectoTareas(): Promise<ProyectoTarea[]> {
+  if (!navigator.onLine) return localDB.proyecto_tareas.toArray();
+  try {
+    const data = await apiFetch('/api/proyecto-tareas');
+    return await safeBulkReplace(localDB.proyecto_tareas, data);
+  } catch {
+    return localDB.proyecto_tareas.toArray();
+  }
+}
+
+export async function getProyectoTarea(id: number): Promise<ProyectoTarea | undefined> {
+  if (!navigator.onLine) return localDB.proyecto_tareas.get(id);
+  try {
+    const data = await apiFetch(`/api/proyecto-tareas/${id}`);
+    const localData = toLocal(data, true);
+    await localDB.proyecto_tareas.put(localData);
+    return localData as ProyectoTarea;
+  } catch {
+    return localDB.proyecto_tareas.get(id);
+  }
+}
+
+export async function createProyectoTarea(input: any) {
+  return addToLocal(localDB.proyecto_tareas, input, '/api/proyecto-tareas', (data) => ({
+    ...data,
+    activo: boolToNum(true),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateProyectoTarea(id: number, input: any) {
+  await updateLocal(localDB.proyecto_tareas, id, input, `/api/proyecto-tareas/${id}`, (data) => data);
+}
+
+export async function deleteProyectoTarea(id: number) {
+  await deleteLocal(localDB.proyecto_tareas, id, `/api/proyecto-tareas/${id}`);
+}
+
+// ─── RegistroHabito ───────────────────────────────────────
+
+export async function getRegistroHabitos(): Promise<RegistroHabito[]> {
+  if (!navigator.onLine) return localDB.registro_habitos.toArray();
+  try {
+    const data = await apiFetch('/api/registro-habitos');
+    return await safeBulkReplace(localDB.registro_habitos, data);
+  } catch {
+    return localDB.registro_habitos.toArray();
+  }
+}
+
+export async function createRegistroHabito(input: any) {
+  return addToLocal(localDB.registro_habitos, input, '/api/registro-habitos', (data) => ({
+    ...data,
+    completado: boolToNum(data.completado || false),
+    points_ganados: data.points_ganados || 0,
+    streak_actual: data.streak_actual || 0,
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateRegistroHabito(id: number, input: any) {
+  await updateLocal(localDB.registro_habitos, id, input, `/api/registro-habitos/${id}`, (data) => ({
+    ...data,
+    completado: typeof data.completado === 'boolean' ? boolToNum(data.completado) : data.completado,
+  }));
+}
+
+export async function deleteRegistroHabito(id: number) {
+  await deleteLocal(localDB.registro_habitos, id, `/api/registro-habitos/${id}`);
+}
+
+// ─── RegistroTarea ────────────────────────────────────────
+
+export async function getRegistroTareas(): Promise<RegistroTarea[]> {
+  if (!navigator.onLine) return localDB.registro_tareas.toArray();
+  try {
+    const data = await apiFetch('/api/registro-tareas');
+    return await safeBulkReplace(localDB.registro_tareas, data);
+  } catch {
+    return localDB.registro_tareas.toArray();
+  }
+}
+
+export async function createRegistroTarea(input: any) {
+  return addToLocal(localDB.registro_tareas, input, '/api/registro-tareas', (data) => ({
+    ...data,
+    completado: boolToNum(data.completado || false),
+    created_at: new Date().toISOString(),
+    _sincronizado: 0,
+    _ultimaModificacion: new Date().toISOString(),
+  }));
+}
+
+export async function updateRegistroTarea(id: number, input: any) {
+  await updateLocal(localDB.registro_tareas, id, input, `/api/registro-tareas/${id}`, (data) => ({
+    ...data,
+    completado: typeof data.completado === 'boolean' ? boolToNum(data.completado) : data.completado,
+  }));
+}
+
+export async function deleteRegistroTarea(id: number) {
+  await deleteLocal(localDB.registro_tareas, id, `/api/registro-tareas/${id}`);
 }

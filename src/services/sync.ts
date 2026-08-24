@@ -15,6 +15,10 @@ const tableMap: Record<string, any> = {
   'macros': localDB.macros,
   'dayli-tracks': localDB.dayliTracks,
   'food-logs': localDB.foodLogs,
+  'proyecto-habitos': localDB.proyecto_habitos,
+  'proyecto-tareas': localDB.proyecto_tareas,
+  'registro-habitos': localDB.registro_habitos,
+  'registro-tareas': localDB.registro_tareas,
 };
 
 function getTableFromEndpoint(endpoint: string) {
@@ -141,7 +145,8 @@ export async function discardPendingOperation(id: number) {
 import { 
   getAreas, getProyectos, getMetricas, getProyectoMetricas, getRegistroEvaluaciones,
   getRewards, getPuntosUsados, getTasks, getPuntosGanados, getFormularios,
-  getMacros, getDayliTracks, getFoodLogs
+  getMacros, getDayliTracks, getFoodLogs,
+  getProyectoHabitos, getProyectoTareas, getRegistroHabitos, getRegistroTareas
 } from './api';
 
 export async function downloadAllData() {
@@ -160,7 +165,11 @@ export async function downloadAllData() {
       getFormularios(),
       getMacros(),
       getDayliTracks(),
-      getFoodLogs()
+      getFoodLogs(),
+      getProyectoHabitos(),
+      getProyectoTareas(),
+      getRegistroHabitos(),
+      getRegistroTareas()
     ]);
   } catch (error) {
     console.error("Error al descargar datos globales:", error);

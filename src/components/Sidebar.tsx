@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, Folder, BarChart2, CheckSquare, Calendar, Gift, Apple, Sun, Moon, Menu, Database, X } from 'lucide-react';
+import { Home, Folder, BarChart2, CheckSquare, Calendar, Gift, Apple, Sun, Moon, Menu, Database, X, BookOpen } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import './Sidebar.css';
@@ -16,6 +16,7 @@ export function Sidebar() {
     { icon: Calendar, path: '/evaluacion', label: 'Evaluación', tooltip: 'Evaluaciones' },
     { icon: Gift, path: '/premios', label: 'Premios', tooltip: 'Gestión de Premios' },
     { icon: Apple, path: '/food-tracker', label: 'Food Tracker', tooltip: 'Dieta y Macros' },
+    { icon: BookOpen, path: '/learning', label: 'Learning', tooltip: 'Aprendizaje' },
     { icon: Database, path: '/sync-admin', label: 'Sincronización', tooltip: 'Estado de Datos' },
   ];
 

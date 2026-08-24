@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDB, type Proyecto, type Metrica, type ProyectoMetrica } from '../db/localDb';
+import { localDB, type Proyecto, type Metrica, type ProyectoMetrica, type ProyectoHabito } from '../db/localDb';
 import { 
   getArea, getProyectos, createProyecto, updateProyecto,
   getMetricas, createMetrica, updateMetrica,
-  getProyectoMetricas, createProyectoMetrica, updateProyectoMetrica
+  getProyectoMetricas, createProyectoMetrica, updateProyectoMetrica,
+  getProyectoHabitos, createProyectoHabito, updateProyectoHabito,
+  getProyectoTareas, createProyectoTarea, updateProyectoTarea, deleteProyectoTarea
 } from '../services/api';
 import { 
   ArrowLeft, Folder, BarChart2, Plus, Edit2, Trash2, X, 
-  Calendar, Target, Link as LinkIcon
+  Calendar, Target, Link as LinkIcon, CheckSquare, Flame, Clock, ListChecks
 } from 'lucide-react';
 import './DetalleAreaView.css';
 
@@ -25,6 +27,8 @@ export function DetalleAreaView() {
   const proyectos = useLiveQuery(() => localDB.proyectos.filter(p => p.id_area === idArea && p.estado === 1).toArray(), [idArea]) || [];
   const metricas = useLiveQuery(() => localDB.metricas.filter(m => m.id_area === idArea && m.estado === 1).toArray(), [idArea]) || [];
   const pmRelations = useLiveQuery(() => localDB.proyecto_metricas.filter(pm => pm.activo === 1).toArray(), []) || [];
+  const habitos = useLiveQuery(() => localDB.proyecto_habitos.filter(h => h.activo === 1).toArray(), []) || [];
+  const todasTareas = useLiveQuery(() => localDB.proyecto_tareas.filter(t => t.activo === 1).toArray(), []) || [];
 
   // Refrescar DB
   useEffect(() => {
@@ -33,6 +37,8 @@ export function DetalleAreaView() {
       getProyectos().catch(console.error);
       getMetricas().catch(console.error);
       getProyectoMetricas().catch(console.error);
+      getProyectoHabitos().catch(console.error);
+      getProyectoTareas().catch(console.error);
     }
   }, [idArea]);
 
@@ -62,6 +68,18 @@ export function DetalleAreaView() {
   const [relConfigMensual, setRelConfigMensual] = useState({ times_per_period: 1, days_of_month: '' });
   const [relConfigSemanal, setRelConfigSemanal] = useState({ days_of_week: '1,3,5' });
   const [relConfigDiario, setRelConfigDiario] = useState({ time: '' });
+
+  // --- Estados Modal Hábitos & Mini-Tareas ---
+  const [isHabitoModalOpen, setIsHabitoModalOpen] = useState(false);
+  const [selectedProjForHabito, setSelectedProjForHabito] = useState<Proyecto | null>(null);
+  const [existingHabito, setExistingHabito] = useState<ProyectoHabito | null>(null);
+  const [habitoDias, setHabitoDias] = useState<Record<string, boolean>>({
+    lunes: true, martes: true, miercoles: true, jueves: true, viernes: true, sabado: false, domingo: false
+  });
+  const [horaObjetivo, setHoraObjetivo] = useState('');
+  const [pointsPorCompletar, setPointsPorCompletar] = useState(10);
+  const [habitoTareas, setHabitoTareas] = useState<{ id?: number; nombre: string; descripcion?: string; tiempo_estimado_minutos: number; orden: number }[]>([]);
+  const [newTareaForm, setNewTareaForm] = useState({ nombre: '', descripcion: '', tiempo_estimado_minutos: 15 });
 
   // -----------------------------------------
   // HANDLERS PROYECTOS
@@ -237,6 +255,115 @@ export function DetalleAreaView() {
     setIsRelModalOpen(false);
   };
 
+  // -----------------------------------------
+  // HANDLERS HÁBITOS & MINI-TAREAS
+  // -----------------------------------------
+  const openHabitoModal = (p: Proyecto) => {
+    setSelectedProjForHabito(p);
+    const hab = habitos.find(h => h.id_proyecto === p.id);
+    if (hab) {
+      setExistingHabito(hab);
+      let diasObj: Record<string, boolean> = {
+        lunes: true, martes: true, miercoles: true, jueves: true, viernes: true, sabado: false, domingo: false
+      };
+      if (typeof hab.dias_semana === 'string') {
+        try { diasObj = JSON.parse(hab.dias_semana); } catch {}
+      } else if (typeof hab.dias_semana === 'object') {
+        diasObj = { ...hab.dias_semana };
+      }
+      setHabitoDias(diasObj);
+      setHoraObjetivo(hab.hora_objetivo ? hab.hora_objetivo.slice(0, 5) : '');
+      setPointsPorCompletar(hab.points_por_completar || 10);
+
+      const tareas = todasTareas.filter(t => t.id_proyecto_habito === hab.id).sort((a, b) => a.orden - b.orden);
+      setHabitoTareas(tareas.map(t => ({
+        id: t.id,
+        nombre: t.nombre,
+        descripcion: t.descripcion,
+        tiempo_estimado_minutos: t.tiempo_estimado_minutos,
+        orden: t.orden
+      })));
+    } else {
+      setExistingHabito(null);
+      setHabitoDias({ lunes: true, martes: true, miercoles: true, jueves: true, viernes: true, sabado: false, domingo: false });
+      setHoraObjetivo('');
+      setPointsPorCompletar(10);
+      setHabitoTareas([]);
+    }
+    setNewTareaForm({ nombre: '', descripcion: '', tiempo_estimado_minutos: 15 });
+    setIsHabitoModalOpen(true);
+  };
+
+  const toggleDia = (dia: string) => {
+    setHabitoDias(prev => ({ ...prev, [dia]: !prev[dia] }));
+  };
+
+  const handleAddTarea = () => {
+    if (!newTareaForm.nombre.trim()) return;
+    setHabitoTareas(prev => [
+      ...prev,
+      {
+        nombre: newTareaForm.nombre.trim(),
+        descripcion: newTareaForm.descripcion.trim(),
+        tiempo_estimado_minutos: Number(newTareaForm.tiempo_estimado_minutos) || 15,
+        orden: prev.length + 1
+      }
+    ]);
+    setNewTareaForm({ nombre: '', descripcion: '', tiempo_estimado_minutos: 15 });
+  };
+
+  const handleRemoveTarea = async (idx: number, tId?: number) => {
+    if (tId) {
+      await deleteProyectoTarea(tId);
+    }
+    setHabitoTareas(prev => prev.filter((_, i) => i !== idx).map((t, i) => ({ ...t, orden: i + 1 })));
+  };
+
+  const handleSaveHabito = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProjForHabito?.id) return;
+
+    let habitoId = existingHabito?.id;
+    const habPayload = {
+      id_proyecto: selectedProjForHabito.id,
+      dias_semana: habitoDias,
+      hora_objetivo: horaObjetivo || null,
+      points_por_completar: Number(pointsPorCompletar) || 10,
+      activo: 1
+    };
+
+    if (existingHabito?.id) {
+      await updateProyectoHabito(existingHabito.id, habPayload);
+    } else {
+      habitoId = Number(await createProyectoHabito(habPayload));
+    }
+
+    // Guardar / actualizar mini-tareas
+    if (habitoId) {
+      for (const t of habitoTareas) {
+        if (t.id) {
+          await updateProyectoTarea(t.id, {
+            nombre: t.nombre,
+            descripcion: t.descripcion,
+            tiempo_estimado_minutos: t.tiempo_estimado_minutos,
+            orden: t.orden,
+            activo: 1
+          });
+        } else {
+          await createProyectoTarea({
+            id_proyecto_habito: habitoId,
+            nombre: t.nombre,
+            descripcion: t.descripcion,
+            tiempo_estimado_minutos: t.tiempo_estimado_minutos,
+            orden: t.orden
+          });
+        }
+      }
+    }
+
+    setIsHabitoModalOpen(false);
+  };
+
   if (!area && isNaN(idArea)) return <div>Cargando Área...</div>;
 
   return (
@@ -277,6 +404,9 @@ export function DetalleAreaView() {
             {proyectos.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No hay proyectos en esta área.</p>}
             {proyectos.map(p => {
               const rels = pmRelations.filter(rel => rel.id_proyecto === p.id);
+              const hab = habitos.find(h => h.id_proyecto === p.id);
+              const tareasCount = hab ? todasTareas.filter(t => t.id_proyecto_habito === hab.id).length : 0;
+
               return (
                 <div key={p.id} className="item-card">
                   <div className="item-header">
@@ -290,6 +420,22 @@ export function DetalleAreaView() {
                   <div className="item-meta">
                     <span><Target size={14}/> {p.meta}</span>
                     <span><Calendar size={14}/> Inicio: {new Date(p.fecha_inicio).toLocaleDateString()}</span>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>Tracking Diario / Hábito:</div>
+                    {hab ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span className="badge" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckSquare size={13} /> {tareasCount} {tareasCount === 1 ? 'paso' : 'pasos'} • {hab.points_por_completar} pts
+                        </span>
+                        <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Flame size={13} /> {hab.record_streak || 0} streak
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: '#888' }}>Sin hábito configurado</span>
+                    )}
                   </div>
 
                   <div style={{ marginBottom: '16px' }}>
@@ -311,6 +457,9 @@ export function DetalleAreaView() {
                   </div>
 
                   <div className="item-footer">
+                    <button className="btn-icon" onClick={() => openHabitoModal(p)} title="Configurar Hábito / Mini-tareas" style={{ color: hab ? '#10b981' : 'inherit' }}>
+                      <CheckSquare size={16} />
+                    </button>
                     <button className="btn-icon" onClick={() => openRelModal(p.id!)} title="Asignar Métrica">
                       <LinkIcon size={16} />
                     </button>
@@ -583,6 +732,207 @@ export function DetalleAreaView() {
               <div className="modal-footer">
                 <button type="button" className="action-btn" onClick={() => setIsRelModalOpen(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary">Asignar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Configurar Hábito y Mini-tareas */}
+      {isHabitoModalOpen && selectedProjForHabito && (
+        <div className="modal-overlay" onClick={() => setIsHabitoModalOpen(false)}>
+          <div className="glass-card modal-content" style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                  <CheckSquare style={{ color: 'var(--accent-primary)' }} /> Hábito Diario / Programado
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
+                  Proyecto: <strong>{selectedProjForHabito.nombre}</strong>
+                </p>
+              </div>
+              <button className="action-btn" onClick={() => setIsHabitoModalOpen(false)}><X size={24} /></button>
+            </div>
+
+            <form onSubmit={handleSaveHabito} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Días de la Semana */}
+              <div className="form-group">
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Días de Ejecución *</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {[
+                    { key: 'lunes', label: 'Lun' },
+                    { key: 'martes', label: 'Mar' },
+                    { key: 'miercoles', label: 'Mié' },
+                    { key: 'jueves', label: 'Jue' },
+                    { key: 'viernes', label: 'Vie' },
+                    { key: 'sabado', label: 'Sáb' },
+                    { key: 'domingo', label: 'Dom' }
+                  ].map(d => {
+                    const active = !!habitoDias[d.key];
+                    return (
+                      <button
+                        key={d.key}
+                        type="button"
+                        onClick={() => toggleDia(d.key)}
+                        style={{
+                          flex: '1 1 50px',
+                          padding: '10px 6px',
+                          borderRadius: '8px',
+                          border: active ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
+                          background: active ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                          color: active ? '#fff' : 'var(--text-muted)',
+                          fontWeight: active ? 'bold' : 'normal',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Hora y Puntos */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Clock size={14} /> Hora Sugerida (Opcional)
+                  </label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={horaObjetivo}
+                    onChange={e => setHoraObjetivo(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                    <Flame size={14} style={{ color: '#f59e0b' }} /> Puntos al Completar *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    required
+                    value={pointsPorCompletar}
+                    onChange={e => setPointsPorCompletar(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              {/* Mini Tareas / Pasos */}
+              <div className="form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, margin: 0 }}>
+                    <ListChecks size={16} /> Mini-Tareas / Pasos ({habitoTareas.length})
+                  </label>
+                </div>
+
+                {/* Lista de tareas existentes */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  {habitoTareas.length === 0 && (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
+                      No has agregado mini-tareas aún. Agrega los pasos necesarios para completar este proyecto diariamente.
+                    </p>
+                  )}
+                  {habitoTareas.map((t, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '8px',
+                        padding: '10px 14px',
+                        gap: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                        <span style={{ 
+                          width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' 
+                        }}>
+                          {idx + 1}
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 500, color: 'var(--text-main)', wordBreak: 'break-word' }}>{t.nombre}</div>
+                          {t.descripcion && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.descripcion}</div>}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>
+                          ⏱️ {t.tiempo_estimado_minutos} min
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-icon danger"
+                          onClick={() => handleRemoveTarea(idx, t.id)}
+                          title="Eliminar paso"
+                          style={{ padding: '6px' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Formulario para agregar nuevo paso */}
+                <div style={{
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  border: '1px dashed rgba(255, 255, 255, 0.15)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-primary)' }}>+ Agregar Mini-Tarea</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '10px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Ej. Read (2) - Write (2)"
+                      value={newTareaForm.nombre}
+                      onChange={e => setNewTareaForm({ ...newTareaForm, nombre: e.target.value })}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTarea(); } }}
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      className="form-input"
+                      placeholder="Minutos"
+                      value={newTareaForm.tiempo_estimado_minutos}
+                      onChange={e => setNewTareaForm({ ...newTareaForm, tiempo_estimado_minutos: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Descripción u objetivo del paso (opcional)"
+                      value={newTareaForm.descripcion}
+                      onChange={e => setNewTareaForm({ ...newTareaForm, descripcion: e.target.value })}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTarea(); } }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={handleAddTarea}
+                      style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: '13px' }}
+                    >
+                      <Plus size={15} /> Agregar
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ marginTop: '12px' }}>
+                <button type="button" className="action-btn" onClick={() => setIsHabitoModalOpen(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary">Guardar Hábito</button>
               </div>
             </form>
           </div>

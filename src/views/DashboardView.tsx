@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { localDB } from '../db/localDb';
+import { localDB, type ProyectoHabito, type ProyectoTarea } from '../db/localDb';
 import { SyncIndicator } from '../components/SyncIndicator';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { 
@@ -11,8 +11,22 @@ import {
   getProyectoMetricas, 
   getRegistroEvaluaciones,
   getPuntosUsados,
-  getRewards
+  getRewards,
+  getProyectoHabitos,
+  getProyectoTareas,
+  getRegistroHabitos,
+  getRegistroTareas,
+  createRegistroHabito,
+  updateRegistroHabito,
+  createRegistroTarea,
+  updateRegistroTarea,
+  updateProyectoHabito,
+  createPuntosGanados
 } from '../services/api';
+import { 
+  Flame, ChevronDown, ChevronUp, Check, Play, 
+  Clock, CheckCircle2, Award
+} from 'lucide-react';
 import './DashboardView.css';
 
 export function DashboardView() {
@@ -32,7 +46,11 @@ export function DashboardView() {
         getProyectoMetricas(),
         getRegistroEvaluaciones(),
         getPuntosUsados(),
-        getRewards()
+        getRewards(),
+        getProyectoHabitos(),
+        getProyectoTareas(),
+        getRegistroHabitos(),
+        getRegistroTareas()
       ]).catch(console.error);
     }
   }, []);
@@ -40,12 +58,159 @@ export function DashboardView() {
   const pointReview = useLiveQuery(() => localDB.point_review.get(1), []) || { total_puntos: 0 };
   const totalPuntos = pointReview.total_puntos;
 
+  // Data for habits and micro-tasks
+  const proyectos = useLiveQuery(() => localDB.proyectos.filter(p => p.estado === 1).toArray(), []) || [];
+  const habitos = useLiveQuery(() => localDB.proyecto_habitos.filter(h => h.activo === 1).toArray(), []) || [];
+  const todasTareas = useLiveQuery(() => localDB.proyecto_tareas.filter(t => t.activo === 1).toArray(), []) || [];
+  const registroHabitos = useLiveQuery(() => localDB.registro_habitos.toArray(), []) || [];
+  const registroTareas = useLiveQuery(() => localDB.registro_tareas.toArray(), []) || [];
+
+  const [expandedHabits, setExpandedHabits] = useState<Record<number, boolean>>({});
+
+  const toggleExpand = (habId: number) => {
+    setExpandedHabits(prev => ({ ...prev, [habId]: !prev[habId] }));
+  };
+
+  // Hoy y día de la semana
+  const dayNames = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const todayDayName = dayNames[new Date().getDay()];
+  const todayStr = new Date().toLocaleDateString('en-CA'); // "YYYY-MM-DD"
+
+  // Filtrar hábitos programados para hoy (o todos los hábitos si ninguno tiene el día asignado)
+  const habitosDeHoy = useMemo(() => {
+    return habitos.map(h => {
+      let dias: Record<string, boolean> = {};
+      if (typeof h.dias_semana === 'string') {
+        try { dias = JSON.parse(h.dias_semana); } catch {}
+      } else if (typeof h.dias_semana === 'object') {
+        dias = h.dias_semana as any;
+      }
+      
+      const tocaHoy = dias[todayDayName] !== false; // true si está marcado o por defecto
+      const proyecto = proyectos.find(p => p.id === h.id_proyecto);
+      const tareas = todasTareas.filter(t => t.id_proyecto_habito === h.id).sort((a, b) => a.orden - b.orden);
+      
+      const regHabito = registroHabitos.find(r => r.id_proyecto_habito === h.id && r.fecha === todayStr);
+      
+      const tareasStatus = tareas.map(t => {
+        const regTarea = regHabito 
+          ? registroTareas.find(rt => rt.id_registro_habito === regHabito.id && rt.id_proyecto_tarea === t.id)
+          : undefined;
+        const completado = regTarea?.completado === 1;
+        return { tarea: t, completado, regTarea };
+      });
+
+      const totalTareasCount = tareas.length;
+      const completadasCount = tareasStatus.filter(ts => ts.completado).length;
+      const completadoHoy = regHabito?.completado === 1 || (totalTareasCount > 0 && completadasCount === totalTareasCount);
+
+      return {
+        habito: h,
+        proyecto,
+        tocaHoy,
+        tareas: tareasStatus,
+        totalTareasCount,
+        completadasCount,
+        regHabito,
+        completadoHoy
+      };
+    });
+  }, [habitos, proyectos, todasTareas, registroHabitos, registroTareas, todayDayName, todayStr]);
+
+  // Completar o desmarcar mini-tarea
+  const handleToggleTask = async (habito: ProyectoHabito, tarea: ProyectoTarea, currentDone: boolean) => {
+    if (!habito.id || !tarea.id) return;
+
+    // 1. Buscar o crear el registro_habito de hoy
+    let regHab = registroHabitos.find(r => r.id_proyecto_habito === habito.id && r.fecha === todayStr);
+    let regHabId = regHab?.id;
+
+    if (!regHabId) {
+      regHabId = Number(await createRegistroHabito({
+        id_proyecto_habito: habito.id,
+        fecha: todayStr,
+        completado: 0,
+        streak_actual: habito.record_streak || 0,
+        points_ganados: 0,
+        notas: ''
+      }));
+    }
+
+    if (!regHabId) return;
+
+    // 2. Crear o actualizar registro_tarea
+    const newDone = currentDone ? 0 : 1;
+    const existingRT = registroTareas.find(rt => rt.id_registro_habito === regHabId && rt.id_proyecto_tarea === tarea.id);
+
+    if (existingRT?.id) {
+      await updateRegistroTarea(existingRT.id, {
+        ...existingRT,
+        completado: newDone,
+        fecha_completado: newDone === 1 ? new Date().toISOString() : null
+      });
+    } else {
+      await createRegistroTarea({
+        id_proyecto_tarea: tarea.id,
+        id_registro_habito: regHabId,
+        completado: newDone,
+        fecha_completado: newDone === 1 ? new Date().toISOString() : null,
+        tiempo_real_minutos: tarea.tiempo_estimado_minutos
+      });
+    }
+
+    // 3. Evaluar completitud total del hábito
+    const habitTareas = todasTareas.filter(t => t.id_proyecto_habito === habito.id);
+    const updatedRTs = await localDB.registro_tareas.filter(rt => rt.id_registro_habito === regHabId).toArray();
+    const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1]));
+    doneMap.set(tarea.id, newDone === 1);
+
+    const allFinished = habitTareas.length > 0 && habitTareas.every(t => doneMap.get(t.id!) === true);
+
+    if (allFinished && regHab?.completado !== 1) {
+      const newStreak = (habito.record_streak || 0) + 1;
+      const newBestStreak = Math.max(habito.best_streak || 0, newStreak);
+      const pointsToAward = habito.points_por_completar || 10;
+
+      await updateRegistroHabito(regHabId, {
+        id_proyecto_habito: habito.id,
+        fecha: todayStr,
+        completado: 1,
+        fecha_completado: new Date().toISOString(),
+        points_ganados: pointsToAward,
+        streak_actual: newStreak
+      });
+
+      await updateProyectoHabito(habito.id, {
+        record_streak: newStreak,
+        best_streak: newBestStreak,
+        ultima_fecha_completada: todayStr
+      });
+
+      await createPuntosGanados({
+        id_registro_habito: regHabId,
+        points: pointsToAward,
+        tipo_origen: 'habito',
+        fecha_registro: new Date().toISOString()
+      });
+
+      const pr = await localDB.point_review.get(1);
+      if (pr) {
+        await localDB.point_review.put({ id: 1, total_puntos: pr.total_puntos + pointsToAward });
+      }
+    } else if (!allFinished && regHab?.completado === 1) {
+      await updateRegistroHabito(regHabId, {
+        ...regHab,
+        completado: 0,
+        fecha_completado: null
+      });
+    }
+  };
+
   // Data for charts
   const formularios = useLiveQuery(async () => {
     const data = await localDB.formularios.toArray();
     return data.sort((a, b) => (a.fechaRegistro || '').localeCompare(b.fechaRegistro || ''));
   }, []) || [];
-  const proyectos = useLiveQuery(() => localDB.proyectos.filter(p => p.estado === 1).toArray(), []) || [];
   const metricas = useLiveQuery(() => localDB.metricas.filter(m => m.estado === 1).toArray(), []) || [];
   const proyectoMetricas = useLiveQuery(() => localDB.proyecto_metricas.filter(pm => pm.activo === 1).toArray(), []) || [];
   const registros = useLiveQuery(async () => {
@@ -79,10 +244,8 @@ export function DashboardView() {
   const projectMetricsData = useMemo(() => {
     if (!selectedProjectId) return [];
     
-    // Find all metrics for this project
     const pMetrics = proyectoMetricas.filter(pm => pm.id_proyecto === selectedProjectId);
     
-    // Group records by metric
     return pMetrics.map(pm => {
       const metric = metricas.find(m => m.id === pm.id_metrica);
       const pmRegistros = registros.filter(r => r.id_proyecto_metrica === pm.id);
@@ -101,7 +264,7 @@ export function DashboardView() {
           }
         } catch {}
         return {
-          date: r.fecha_evaluacion ? r.fecha_evaluacion.slice(0, 10) : '', // Take only date part
+          date: r.fecha_evaluacion ? r.fecha_evaluacion.slice(0, 10) : '',
           ...vals
         };
       });
@@ -122,7 +285,7 @@ export function DashboardView() {
         keys,
         data: chartData
       };
-    }).filter(m => m.data.length > 0); // Only return metrics with data
+    }).filter(m => m.data.length > 0);
   }, [selectedProjectId, proyectoMetricas, metricas, registros]);
 
   const puntosHoy = useLiveQuery(async () => {
@@ -154,7 +317,7 @@ export function DashboardView() {
       {/* ── HEADER ── */}
       <header className="dashboard-header">
         <div className="dashboard-header-title">
-          <h1>Good Evening, <span style={{ color: 'var(--accent-primary)' }}>User</span></h1>
+          <h1>Good Day, <span style={{ color: 'var(--accent-primary)' }}>Tracker</span></h1>
           <p>Stay focused and make it happen.</p>
         </div>
         <div className="glass-card" style={{ padding: '10px 20px' }}>
@@ -180,6 +343,156 @@ export function DashboardView() {
           <span className="stat-number" style={{ color: '#ef4444' }}>-{puntosHoy.totalGastados}</span>
           <span className="stat-label">Puntos Gastados</span>
         </div>
+      </section>
+
+      {/* ── SECCIÓN MICRO HABITS (TRACKING DIARIO) ── */}
+      <section className="micro-habits-section">
+        <div className="micro-habits-header">
+          <h2>
+            <Flame style={{ color: '#f59e0b' }} /> Micro Habits ({habitosDeHoy.length})
+          </h2>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+            {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+
+        {habitosDeHoy.length === 0 ? (
+          <div className="glass-card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <p style={{ margin: 0 }}>No hay hábitos configurados para hoy. Ve a tus <strong>Áreas y Proyectos</strong> para activar hábitos y mini-tareas.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {habitosDeHoy.map(({ habito, proyecto, tareas, totalTareasCount, completadasCount, completadoHoy }) => {
+              const isExpanded = !!expandedHabits[habito.id!];
+              const streak = habito.record_streak || 0;
+
+              return (
+                <div key={habito.id} className={`habit-card ${completadoHoy ? 'completed' : ''}`}>
+                  {/* Cabecera del Hábito */}
+                  <div className="habit-card-header" onClick={() => toggleExpand(habito.id!)}>
+                    <div className="habit-card-left">
+                      {/* Badge de Progreso Circular */}
+                      <div className={`habit-progress-badge ${completadoHoy ? 'all-done' : ''}`}>
+                        {completadoHoy ? <Check size={20} /> : `${completadasCount}/${totalTareasCount}`}
+                      </div>
+
+                      {/* Información y Título */}
+                      <div className="habit-info">
+                        <h3 className="habit-title">
+                          {proyecto?.nombre || `Proyecto #${habito.id_proyecto}`}
+                        </h3>
+                        <div className="habit-streak-row">
+                          <div className="streak-dots">
+                            {[1, 2, 3, 4, 5].map(dotIdx => (
+                              <div
+                                key={dotIdx}
+                                className={`streak-dot ${streak >= dotIdx || (streak > 0 && (streak % 5 >= dotIdx || streak % 5 === 0)) ? 'active' : ''}`}
+                              />
+                            ))}
+                          </div>
+                          <span>{streak} day streak</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="habit-card-right">
+                      {habito.hora_objetivo && (
+                        <span className="habit-due-time">
+                          <Clock size={13} /> {habito.hora_objetivo.slice(0, 5)}
+                        </span>
+                      )}
+                      {completadoHoy && (
+                        <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '4px 8px', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Award size={13} /> +{habito.points_por_completar} pts
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-icon"
+                        style={{ padding: '6px', color: 'var(--text-muted)' }}
+                        onClick={(e) => { e.stopPropagation(); toggleExpand(habito.id!); }}
+                      >
+                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Contenido Expandido: Meta y Timeline de Mini-Tareas */}
+                  {isExpanded && (
+                    <div className="habit-expanded-content">
+                      {proyecto?.meta && (
+                        <div className="habit-outcome">
+                          <strong>Outcome:</strong> {proyecto.meta}
+                        </div>
+                      )}
+
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                        Habits:
+                      </div>
+
+                      {tareas.length === 0 ? (
+                        <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
+                          No hay mini-tareas registradas para este hábito.
+                        </p>
+                      ) : (
+                        <div className="habit-timeline">
+                          {tareas.map(({ tarea, completado }, idx) => {
+                            const isNextDone = idx < tareas.length - 1 && tareas[idx + 1].completado;
+
+                            return (
+                              <div key={tarea.id} className="habit-timeline-item">
+                                {/* Línea vertical conectora */}
+                                {idx < tareas.length - 1 && (
+                                  <div className={`timeline-connector ${completado && isNextDone ? 'completed' : ''}`} />
+                                )}
+
+                                {/* Tiempo estimado */}
+                                <div className="timeline-time">
+                                  {tarea.tiempo_estimado_minutos} min
+                                </div>
+
+                                {/* Nodo circular */}
+                                <div
+                                  className={`timeline-node ${completado ? 'done' : ''}`}
+                                  onClick={() => handleToggleTask(habito, tarea, completado)}
+                                >
+                                  {completado && <Check size={13} />}
+                                </div>
+
+                                {/* Contenido de la tarea */}
+                                <div className="timeline-content">
+                                  <div>
+                                    <div className={`timeline-title ${completado ? 'done' : ''}`}>
+                                      {tarea.nombre}
+                                    </div>
+                                    {tarea.descripcion && (
+                                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        {tarea.descripcion}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className={`timeline-action-btn ${completado ? 'done' : ''}`}
+                                    onClick={() => handleToggleTask(habito, tarea, completado)}
+                                    title={completado ? 'Desmarcar tarea' : 'Completar tarea'}
+                                  >
+                                    {completado ? <CheckCircle2 size={16} /> : <Play size={14} style={{ marginLeft: '2px' }} />}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* ── CONTENIDO INFERIOR ── */}
@@ -312,6 +625,7 @@ export function DashboardView() {
           </div>
 
         </div>
+
       </section>
 
     </div>

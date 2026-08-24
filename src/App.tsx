@@ -12,7 +12,7 @@ import { EvaluacionView } from './views/EvaluacionView';
 
 import { PremiosView } from './views/PremiosView';
 import { FoodTrackerView } from './views/FoodTrackerView';
-
+import BookOpen from './views/BookOpen';
 import { SyncAdminView } from './views/SyncAdminView';
 
 function App() {
@@ -42,6 +42,7 @@ function App() {
           <Route path="/evaluacion" element={<EvaluacionView />} />
           <Route path="/premios" element={<PremiosView />} />
           <Route path="/food-tracker" element={<FoodTrackerView />} />
+          <Route path="/learning" element={<BookOpen />} />
           <Route path="/sync-admin" element={<SyncAdminView />} />
         </Route>
         
