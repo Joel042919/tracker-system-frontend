@@ -333,6 +333,8 @@ export interface PendingOperation {
   timestamp: string; // ISO
   localId?: string | number;
   tableName?: string;
+  error?: string;
+  lastAttempt?: string;
 }
 
 class TrackerDB extends Dexie {

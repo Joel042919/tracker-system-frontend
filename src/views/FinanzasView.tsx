@@ -1070,7 +1070,7 @@ export function FinanzasView() {
               </div>
 
               <div className="form-group">
-                <label>Saldo Inicial (S/) *</label>
+                <label>{editingMedio ? 'Saldo Actual / Ajustar Saldo (S/) *' : 'Saldo Inicial (S/) *'}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1079,6 +1079,9 @@ export function FinanzasView() {
                   value={medioForm.saldo_inicial}
                   onChange={e => setMedioForm({ ...medioForm, saldo_inicial: e.target.value })}
                 />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  {editingMedio ? 'Si cambias el saldo, se registrará un movimiento de ajuste contable automático.' : 'Se guardará como saldo disponible y movimiento de ingreso inicial.'}
+                </span>
               </div>
 
               <div className="modal-footer">

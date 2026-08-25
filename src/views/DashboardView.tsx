@@ -104,65 +104,154 @@ export function DashboardView() {
 
   // ── Finanzas: Cálculos de Saldo y Periodo ──
   const saldoTotalFinanzas = useMemo(() => {
-    return medios.reduce((acc, m) => acc + (m.saldo_actual || 0), 0);
+    try {
+      return (medios || []).reduce((acc, m) => acc + (Number(m?.saldo_actual) || 0), 0);
+    } catch (err) {
+      console.error("Error calculando saldoTotalFinanzas:", err);
+      return 0;
+    }
   }, [medios]);
 
   const [periodoFinanzas, setPeriodoFinanzas] = useState<'hoy' | 'semana' | 'mes'>('mes');
 
   const movimientosFiltradosPeriodo = useMemo(() => {
-    const now = new Date();
-    const currDate = new Date().toISOString().slice(0, 10);
-    const currMonth = currDate.slice(0, 7);
+    try {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`; // ej: "2026-08-24"
+      const currMonthStr = `${year}-${month}`;   // ej: "2026-08"
 
-    // Inicio de la semana (Lunes)
-    const day = now.getDay();
-    const diffToMonday = now.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(now.setDate(diffToMonday));
-    const mondayStr = monday.toISOString().slice(0, 10);
+      // Calcular Lunes y Domingo de la semana actual (Lunes = 1, Domingo = 7)
+      const dayOfWeek = now.getDay(); // 0 es Domingo, 1 es Lunes, etc.
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
 
-    return movimientos.filter(m => {
-      const fecha = (m.fecha_movimiento || '').slice(0, 10);
-      if (periodoFinanzas === 'hoy') return fecha === currDate;
-      if (periodoFinanzas === 'semana') return fecha >= mondayStr && fecha <= currDate;
-      if (periodoFinanzas === 'mes') return fecha.startsWith(currMonth);
-      return true;
-    });
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+      const monYear = monday.getFullYear();
+      const monMonth = String(monday.getMonth() + 1).padStart(2, '0');
+      const monDay = String(monday.getDate()).padStart(2, '0');
+      const mondayStr = `${monYear}-${monMonth}-${monDay}`;
+
+      const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+      const sunYear = sunday.getFullYear();
+      const sunMonth = String(sunday.getMonth() + 1).padStart(2, '0');
+      const sunDay = String(sunday.getDate()).padStart(2, '0');
+      const sundayStr = `${sunYear}-${sunMonth}-${sunDay}`;
+
+      const extractFecha = (raw: any): string => {
+        if (raw === null || raw === undefined) return '';
+        if (typeof raw === 'number') {
+          const d = new Date(raw < 10000000000 ? raw * 1000 : raw);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const da = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${da}`;
+          }
+        }
+        if (raw instanceof Date && !isNaN(raw.getTime())) {
+          const y = raw.getFullYear();
+          const m = String(raw.getMonth() + 1).padStart(2, '0');
+          const da = String(raw.getDate()).padStart(2, '0');
+          return `${y}-${m}-${da}`;
+        }
+        const str = String(raw).trim();
+        const match = str.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+        if (match) {
+          return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+        }
+        const d = new Date(str);
+        if (!isNaN(d.getTime())) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const da = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${da}`;
+        }
+        return '';
+      };
+
+      const result = (movimientos || []).filter(m => {
+        if (!m) return false;
+        const rawDate = m.fecha_movimiento ?? (m as any).fecha ?? (m as any).fechaMovimiento ?? m.created_at;
+        const fecha = extractFecha(rawDate);
+        if (!fecha) return false;
+
+        if (periodoFinanzas === 'hoy') {
+          return fecha === todayStr;
+        }
+        if (periodoFinanzas === 'semana') {
+          return fecha >= mondayStr && fecha <= sundayStr;
+        }
+        if (periodoFinanzas === 'mes') {
+          return fecha.startsWith(currMonthStr);
+        }
+        return true;
+      });
+
+      console.log(`[Dashboard Finanzas] Periodo: ${periodoFinanzas}, Hoy: ${todayStr}, Semana: ${mondayStr} a ${sundayStr}, Total: ${movimientos?.length || 0}, Filtrados: ${result.length}`);
+
+      return result;
+    } catch (err) {
+      console.error("[Dashboard Finanzas] Error filtrando movimientos:", err);
+      return movimientos || [];
+    }
   }, [movimientos, periodoFinanzas]);
 
   const totalIngresosPeriodo = useMemo(() => {
-    return movimientosFiltradosPeriodo
-      .filter(m => m.tipo === 'I')
-      .reduce((sum, m) => sum + m.monto, 0);
+    try {
+      return (movimientosFiltradosPeriodo || [])
+        .filter(m => m && m.tipo === 'I')
+        .reduce((sum, m) => sum + (Number(m.monto) || 0), 0);
+    } catch (err) {
+      console.error("Error calculando totalIngresosPeriodo:", err);
+      return 0;
+    }
   }, [movimientosFiltradosPeriodo]);
 
   const totalEgresosPeriodo = useMemo(() => {
-    return movimientosFiltradosPeriodo
-      .filter(m => m.tipo === 'E')
-      .reduce((sum, m) => sum + m.monto, 0);
+    try {
+      return (movimientosFiltradosPeriodo || [])
+        .filter(m => m && m.tipo === 'E')
+        .reduce((sum, m) => sum + (Number(m.monto) || 0), 0);
+    } catch (err) {
+      console.error("Error calculando totalEgresosPeriodo:", err);
+      return 0;
+    }
   }, [movimientosFiltradosPeriodo]);
 
   // Desglose de egresos por categoría en el periodo
   const egresosPorCategoria = useMemo(() => {
-    const catMap = new Map<string, number>();
-    movimientosFiltradosPeriodo
-      .filter(m => m.tipo === 'E')
-      .forEach(m => {
-        const cat = categoriasFinanzas.find(c => c.id === m.categoria_id)?.categoria || 'Sin categoría';
-        catMap.set(cat, (catMap.get(cat) || 0) + m.monto);
-      });
-    return Array.from(catMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+    try {
+      const catMap = new Map<string, number>();
+      (movimientosFiltradosPeriodo || [])
+        .filter(m => m && m.tipo === 'E')
+        .forEach(m => {
+          const cat = (categoriasFinanzas || []).find(c => c && c.id === m.categoria_id)?.categoria || 'Sin categoría';
+          catMap.set(cat, (catMap.get(cat) || 0) + (Number(m.monto) || 0));
+        });
+      return Array.from(catMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+    } catch (err) {
+      console.error("Error calculando egresosPorCategoria:", err);
+      return [];
+    }
   }, [movimientosFiltradosPeriodo, categoriasFinanzas]);
 
   // Desglose de egresos por medio en el periodo
   const egresosPorMedio = useMemo(() => {
-    const medMap = new Map<string, number>();
-    movimientosFiltradosPeriodo
-      .filter(m => m.tipo === 'E')
-      .forEach(m => {
-        const med = medios.find(med => med.id === m.medio_id)?.medio || 'Otro';
-        medMap.set(med, (medMap.get(med) || 0) + m.monto);
-      });
-    return Array.from(medMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+    try {
+      const medMap = new Map<string, number>();
+      (movimientosFiltradosPeriodo || [])
+        .filter(m => m && m.tipo === 'E')
+        .forEach(m => {
+          const med = (medios || []).find(med => med && med.id === m.medio_id)?.medio || 'Otro';
+          medMap.set(med, (medMap.get(med) || 0) + (Number(m.monto) || 0));
+        });
+      return Array.from(medMap.entries()).map(([nombre, total]) => ({ nombre, total }));
+    } catch (err) {
+      console.error("Error calculando egresosPorMedio:", err);
+      return [];
+    }
   }, [movimientosFiltradosPeriodo, medios]);
 
   // Notificaciones PWA
@@ -591,7 +680,16 @@ export function DashboardView() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+              <span style={{ fontSize: '12px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Wallet size={14} /> Saldo Total Disponible
+              </span>
+              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#60a5fa', marginTop: '4px' }}>
+                S/ {medios.reduce((sum, m) => sum + (m.saldo_actual || 0), 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
+
             <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
               <span style={{ fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <ArrowDownRight size={14} /> Total Ingresos ({periodoFinanzas})

@@ -152,64 +152,81 @@ export function TareasView() {
         </div>
       </div>
 
-      {/* ─── FORMULARIO DE CREACIÓN (MOBILE-FIRST) ─── */}
+      {/* ─── FORMULARIO DE CREACIÓN (RESPONSIVE CON LABELS) ─── */}
       <form className="add-task-form" onSubmit={handleCreateTask}>
-        <div className="form-row">
-          <input 
-            type="text" 
-            className="add-task-input"
-            placeholder="Título de la tarea *" 
-            value={taskname}
-            onChange={(e) => setTaskname(e.target.value)}
-            required
-          />
-          <input 
-            type="text" 
-            className="add-task-input"
-            placeholder="Descripción (opcional)" 
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+        <h3 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 600, color: 'var(--text-main)' }}>
+          + Nueva Tarea
+        </h3>
+        
+        <div className="task-form-grid">
+          <div className="form-group-task" style={{ gridColumn: 'span 2' }}>
+            <label className="task-label">Título de la Tarea *</label>
+            <input 
+              type="text" 
+              className="add-task-input"
+              placeholder="Ej. Revisar capítulo 2 de tesis" 
+              value={taskname}
+              onChange={(e) => setTaskname(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-group-task" style={{ gridColumn: 'span 2' }}>
+            <label className="task-label">Descripción (Opcional)</label>
+            <input 
+              type="text" 
+              className="add-task-input"
+              placeholder="Detalles u objetivos de la tarea" 
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group-task">
+            <label className="task-label">Fecha Límite</label>
+            <input 
+              type="date" 
+              className="add-task-input"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+
+          <div className="form-group-task">
+            <label className="task-label">Puntos Recompensa</label>
+            <input 
+              type="number" 
+              className="add-task-input"
+              placeholder="Puntos" 
+              value={points}
+              onChange={(e) => setPoints(e.target.value)}
+              min="0"
+            />
+          </div>
         </div>
-        <div className="form-row">
-          <input 
-            type="date" 
-            className="add-task-input"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            title="Fecha límite"
-          />
-          <input 
-            type="number" 
-            className="add-task-input"
-            placeholder="Puntos" 
-            value={points}
-            onChange={(e) => setPoints(e.target.value)}
-            min="0"
-            title="Puntos de recompensa"
-            style={{ maxWidth: '100px' }}
-          />
-          <button type="submit" className="add-task-btn">Crear Tarea</button>
-        </div>
+
+        <button type="submit" className="add-task-btn">Crear Tarea</button>
       </form>
 
-      {/* ─── SELECTOR DE COLUMNAS PARA MÓVIL ─── */}
-      <div className="kanban-mobile-tabs">
+      {/* ─── SELECTOR DE FILTROS KANBAN ─── */}
+      <div className="kanban-filter-tabs">
         <button 
-          className={`mobile-tab-btn ${mobileTab === 'all' ? 'active' : ''}`}
+          type="button"
+          className={`filter-tab-pill ${mobileTab === 'all' ? 'active' : ''}`}
           onClick={() => setMobileTab('all')}
         >
-          Todas ({tasks.length})
+          Todas <span className="tab-badge">{tasks.length}</span>
         </button>
         {COLUMNS.map(c => {
           const count = tasks.filter(t => t.status === c.id).length;
           return (
             <button
               key={c.id}
-              className={`mobile-tab-btn ${mobileTab === c.id ? 'active' : ''}`}
+              type="button"
+              className={`filter-tab-pill ${mobileTab === c.id ? 'active' : ''}`}
               onClick={() => setMobileTab(c.id as any)}
             >
-              {c.title} ({count})
+              {c.title} <span className="tab-badge">{count}</span>
             </button>
           );
         })}
@@ -262,10 +279,60 @@ export function TareasView() {
                     </p>
                   )}
 
+                  {/* Botones de cambio de estado táctiles (Mobile-friendly) */}
+                  <div className="task-quick-status-actions">
+                    {task.status !== 'do' && (
+                      <button 
+                        type="button"
+                        className="quick-status-btn" 
+                        onClick={() => handleStatusChangeLogic(task, 'do')}
+                        title="Mover a Por Hacer"
+                      >
+                        <Circle size={12} /> Por Hacer
+                      </button>
+                    )}
+                    {task.status !== 'doing' && (
+                      <button 
+                        type="button"
+                        className="quick-status-btn doing" 
+                        onClick={() => handleStatusChangeLogic(task, 'doing')}
+                        title="Mover a En Progreso"
+                      >
+                        <Clock size={12} /> En Progreso
+                      </button>
+                    )}
+                    {task.status !== 'done' && (
+                      <button 
+                        type="button"
+                        className="quick-status-btn done" 
+                        onClick={() => handleStatusChangeLogic(task, 'done')}
+                        title="Marcar como Completado"
+                      >
+                        <CheckCircle2 size={12} /> Completar
+                      </button>
+                    )}
+                  </div>
+
                   <div className="kanban-card-footer">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
                       <Calendar size={14} />
-                      {task.due_date ? new Date(task.due_date).toLocaleDateString() : '--'}
+                      {(() => {
+                        const rawDate = task.due_date || task.created_at;
+                        if (!rawDate) return 'Sin fecha';
+                        const str = String(rawDate).trim();
+                        const match = str.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+                        if (match) {
+                          const isDue = Boolean(task.due_date);
+                          const dateFormatted = `${match[3].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[1]}`;
+                          return isDue ? `Vence: ${dateFormatted}` : dateFormatted;
+                        }
+                        const d = new Date(rawDate);
+                        if (!isNaN(d.getTime())) {
+                          const dateFormatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                          return task.due_date ? `Vence: ${dateFormatted}` : dateFormatted;
+                        }
+                        return 'Sin fecha';
+                      })()}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="badge-points">{task.points} pts</span>

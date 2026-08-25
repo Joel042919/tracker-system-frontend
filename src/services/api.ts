@@ -1022,7 +1022,7 @@ export async function createMedio(input: any) {
   const newId = crypto.randomUUID();
   const saldoInicial = Number(input.saldo_inicial || 0);
 
-  const res = await addToLocal(localDB.medios, { ...input, id: newId }, '/api/medios', (data) => ({
+  const res = await addToLocal(localDB.medios, { ...input, id: newId, saldo_inicial: saldoInicial }, '/api/medios', (data) => ({
     ...data,
     id: data.id || newId,
     estado: boolToNum(true),
@@ -1035,11 +1035,22 @@ export async function createMedio(input: any) {
   // Inicializar saldo en tabla saldos_actuales
   await localDB.saldos_actuales.put({
     id: crypto.randomUUID(),
-    medio_id: typeof res === 'string' ? res : newId,
+    medio_id: newId,
     saldo: saldoInicial,
     _sincronizado: 1,
     _ultimaModificacion: new Date().toISOString()
   });
+
+  // Si se ingresó un saldo inicial mayor a 0, registrar automáticamente el ingreso inicial
+  if (saldoInicial > 0) {
+    await createMovimiento({
+      medio_id: newId,
+      tipo: 'I',
+      monto: saldoInicial,
+      descripcion: `Saldo inicial - ${input.medio || 'Cuenta'}`,
+      fecha_movimiento: new Date().toISOString()
+    });
+  }
 
   return res;
 }
@@ -1051,29 +1062,43 @@ export async function updateMedio(id: string, input: any) {
   }));
 }
 
-export async function setSaldoMedio(id: string, saldo: number) {
+export async function setSaldoMedio(id: string, nuevoSaldo: number, options?: { createAdjustment?: boolean }) {
   const medio = await localDB.medios.get(id);
+  const oldSaldo = medio?.saldo_actual || 0;
+  const delta = Number((nuevoSaldo - oldSaldo).toFixed(2));
+
   if (medio) {
-    await localDB.medios.update(id, { saldo_actual: saldo });
+    await localDB.medios.update(id, { saldo_actual: nuevoSaldo });
   }
   const saldoRec = await localDB.saldos_actuales.filter(s => s.medio_id === id).first();
   if (saldoRec) {
-    await localDB.saldos_actuales.update(saldoRec.id, { saldo });
+    await localDB.saldos_actuales.update(saldoRec.id, { saldo: nuevoSaldo });
   } else {
-    await localDB.saldos_actuales.put({ id: crypto.randomUUID(), medio_id: id, saldo, _sincronizado: 1 });
+    await localDB.saldos_actuales.put({ id: crypto.randomUUID(), medio_id: id, saldo: nuevoSaldo, _sincronizado: 1 });
+  }
+
+  // Registrar movimiento de ajuste de saldo si hubo cambio y no se deshabilitó
+  if (options?.createAdjustment !== false && delta !== 0) {
+    await createMovimiento({
+      medio_id: id,
+      tipo: delta > 0 ? 'I' : 'E',
+      monto: Math.abs(delta),
+      descripcion: `Ajuste de saldo (${delta > 0 ? '+' : '-'}${Math.abs(delta).toFixed(2)})`,
+      fecha_movimiento: new Date().toISOString()
+    });
   }
 
   if (navigator.onLine) {
     try {
       await apiFetch(`/api/medios/${id}/saldo`, {
         method: 'PUT',
-        body: JSON.stringify({ saldo })
+        body: JSON.stringify({ saldo: nuevoSaldo })
       });
     } catch {
       await localDB.pendingSync.add({
         type: 'UPDATE',
         endpoint: `/api/medios/${id}/saldo`,
-        payload: { saldo },
+        payload: { saldo: nuevoSaldo },
         timestamp: new Date().toISOString()
       });
     }
@@ -1081,7 +1106,7 @@ export async function setSaldoMedio(id: string, saldo: number) {
     await localDB.pendingSync.add({
       type: 'UPDATE',
       endpoint: `/api/medios/${id}/saldo`,
-      payload: { saldo },
+      payload: { saldo: nuevoSaldo },
       timestamp: new Date().toISOString()
     });
   }

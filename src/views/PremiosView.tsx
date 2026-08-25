@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDB, type Reward } from '../db/localDb';
 import { getRewards, createReward, updateReward, createPuntosUsados } from '../services/api';
-import { Gift, Plus, Edit2, Trash2, X, CheckCircle } from 'lucide-react';
-import './EvaluacionView.css'; // Reusing global styles for simplicity
+import { Gift, Plus, Edit2, Trash2, X, CheckCircle, Award } from 'lucide-react';
+import './PremiosView.css';
 
 export function PremiosView() {
   const rewards = useLiveQuery(() => localDB.rewards.filter(r => r.estado === 1).toArray(), []) || [];
@@ -89,66 +89,68 @@ export function PremiosView() {
   };
 
   return (
-    <div className="evaluacion-container" style={{ padding: '24px' }}>
-      <div className="evaluacion-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h1>Premios</h1>
-            <span className="badge" style={{ background: '#10b981', color: 'white', padding: '6px 12px', borderRadius: '16px', fontSize: '16px', fontWeight: 'bold' }}>
-              {totalPoints} pts disponibles
-            </span>
-          </div>
-          <p>Gestiona los premios canjeables con tus puntos.</p>
+    <div className="premios-container">
+      <div className="premios-header">
+        <div className="premios-header-title">
+          <h1>
+            <Award size={28} style={{ color: 'var(--accent-primary)' }} /> Premios
+          </h1>
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>Gestiona y canjea los premios con tus puntos acumulados.</p>
         </div>
-        <button className="btn-primary" onClick={() => openModal()}>
-          <Plus size={18} /> Nuevo Premio
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="premios-points-badge">
+            <Award size={16} /> {totalPoints} pts disponibles
+          </div>
+          <button className="btn-primary" onClick={() => openModal()}>
+            <Plus size={18} /> Nuevo Premio
+          </button>
+        </div>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: '20px',
-        marginTop: '24px'
-      }}>
+      <div className="premios-grid">
         {rewards.length === 0 && (
-          <p className="text-muted" style={{ gridColumn: '1 / -1' }}>No hay premios configurados aún.</p>
+          <p className="text-muted" style={{ gridColumn: '1 / -1', padding: '20px 0' }}>No hay premios configurados aún.</p>
         )}
         
-        {rewards.map(r => (
-          <div key={r.id} className="glass-card" style={{ padding: '20px', position: 'relative' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Gift size={20} style={{ color: 'var(--accent)' }} />
-                <h3 style={{ margin: 0 }}>{r.reward}</h3>
+        {rewards.map(r => {
+          const canReclaim = totalPoints >= r.points_need;
+          return (
+            <div key={r.id} className="glass-card premio-card">
+              <div className="premio-card-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Gift size={20} style={{ color: 'var(--accent-primary)' }} />
+                  <h3 className="premio-card-title">{r.reward}</h3>
+                </div>
+                <span className="premio-cost-badge">
+                  {r.points_need} pts
+                </span>
               </div>
-              <span className="badge" style={{ background: 'var(--primary)', color: 'white', padding: '4px 8px', borderRadius: '12px', fontSize: '13px', fontWeight: 'bold' }}>
-                {r.points_need} pts
-              </span>
+              
+              <p className="premio-card-desc">
+                {r.description || 'Sin descripción adicional.'}
+              </p>
+              
+              <div className="premio-card-actions">
+                <button 
+                  className="btn-reclamar" 
+                  disabled={!canReclaim}
+                  onClick={() => handleReclaimClick(r)}
+                  title={canReclaim ? 'Reclamar Premio' : 'Puntos insuficientes'}
+                >
+                  <Gift size={15} /> Reclamar
+                </button>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button className="btn-icon" onClick={() => openModal(r)} title="Editar">
+                    <Edit2 size={16} />
+                  </button>
+                  <button className="btn-icon danger" onClick={() => handleDelete(r)} title="Eliminar">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
             </div>
-            
-            <p className="text-muted" style={{ fontSize: '14px', marginBottom: '20px', minHeight: '40px' }}>
-              {r.description || 'Sin descripción.'}
-            </p>
-            
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button 
-                className="btn-primary" 
-                style={{ padding: '6px 12px', fontSize: '13px', background: totalPoints >= r.points_need ? 'var(--accent-primary)' : 'var(--text-muted)', cursor: totalPoints >= r.points_need ? 'pointer' : 'not-allowed' }} 
-                onClick={() => handleReclaimClick(r)}
-                title="Reclamar Premio"
-              >
-                Reclamar
-              </button>
-              <button className="btn-icon" onClick={() => openModal(r)} title="Editar">
-                <Edit2 size={16} />
-              </button>
-              <button className="btn-icon danger" onClick={() => handleDelete(r)} title="Eliminar">
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {reclaimReward && (

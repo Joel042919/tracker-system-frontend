@@ -30,7 +30,6 @@ const tableMap: Record<string, any> = {
 };
 
 function getTableFromEndpoint(endpoint: string) {
-  // Extrae la ruta principal del endpoint (ej: "/api/areas/5" -> "areas")
   const match = endpoint.match(/^\/api\/([^\/]+)/);
   if (match && match[1]) {
     return tableMap[match[1]];
@@ -47,20 +46,24 @@ async function processPendingOperation(op: PendingOperation) {
     headers: { 'Content-Type': 'application/json' },
   };
   
-  // Si no es DELETE y hay payload, lo mandamos en el body
   if (type !== 'DELETE' && payload) options.body = JSON.stringify(payload);
 
   const response = await fetch(url, options);
-  if (!response.ok) throw new Error(`Sync error: ${response.statusText}`);
+  if (!response.ok) {
+    let errorDetail = response.statusText;
+    try {
+      const errJson = await response.json();
+      if (errJson?.error) errorDetail = errJson.error;
+    } catch {}
+    throw new Error(`Sync error (${response.status}): ${errorDetail}`);
+  }
   
-  // Algunos endpoints DELETE responden con 204 No Content (sin JSON)
   if (type === 'DELETE' && response.status === 204) return { success: true };
   
   return response.json();
 }
 
 export async function synchronizeData() {
-  // 1. Verificamos conexión real antes de intentar nada
   if (!navigator.onLine) return;
 
   const pending = await localDB.pendingSync.orderBy('timestamp').toArray();
@@ -71,50 +74,57 @@ export async function synchronizeData() {
       const serverResult = await processPendingOperation(op);
       const table = getTableFromEndpoint(op.endpoint);
 
-      // Solo necesitamos hacer ajustes locales en CREATE. 
-      // Los UPDATE y DELETE ya se aplicaron de forma optimista en la UI.
       if (table && op.type === 'CREATE') {
-        
-        // Buscamos el registro temporal (el más antiguo no sincronizado)
-        const tempItems = await table.filter((item: any) => item._sincronizado === 0).toArray();
-        
-        if (tempItems.length > 0) {
-          const tempItem = tempItems[0];
-          
-          // Obtenemos el nombre exacto de la llave primaria ('id', 'idFormulario', etc.)
+        let tempItem: any;
+        if (op.payload?.id) {
+          tempItem = await table.get(op.payload.id);
+        }
+        if (!tempItem) {
+          const tempItems = await table.filter((item: any) => item._sincronizado === 0).toArray();
+          if (tempItems.length > 0) tempItem = tempItems[0];
+        }
+
+        if (tempItem) {
           const pkName = table.schema.primKey.name;
           const tempId = tempItem[pkName];
           
-          // Eliminamos el registro temporal
-          await table.delete(tempId);
+          if (serverResult.id && serverResult.id !== tempId) {
+            await table.delete(tempId);
+          }
           
-          // Mezclamos los datos locales con los del servidor
           const finalData = { 
             ...tempItem, 
             ...serverResult, 
             _sincronizado: 1 
           };
           
-          // Aseguramos de setear la Primary Key correcta según el backend
-          // Esto maneja las tablas con AutoIncrement y las de UUIDs personalizados
           if (serverResult.id) finalData.id = serverResult.id;
           if (serverResult.id_formulario) finalData.idFormulario = serverResult.id_formulario;
           if (serverResult.id_macro) finalData.idMacro = serverResult.id_macro;
           if (serverResult.id_dayli_track) finalData.idDayliTrack = serverResult.id_dayli_track;
           if (serverResult.id_food_log) finalData.idFoodLog = serverResult.id_food_log;
 
-          // Guardamos el registro definitivo
           await table.put(finalData);
+        }
+      } else if (table && op.type === 'UPDATE') {
+        const pkName = table.schema.primKey.name;
+        const targetId = op.payload?.[pkName] || op.localId;
+        if (targetId) {
+          await table.update(targetId, { _sincronizado: 1 });
         }
       }
 
-      // Operación exitosa, la quitamos de la cola de pendientes
       await localDB.pendingSync.delete(op.id!);
       
-    } catch (error) {
-      console.error(`Fallo sincronizando operación en ${op.endpoint}:`, error);
-      // Rompemos el ciclo para mantener el orden de la cola (FIFO)
-      // Así evitamos mandar un UPDATE de algo que falló al hacer CREATE
+    } catch (error: any) {
+      const errMsg = error?.message || 'Error desconocido';
+      console.error(`Fallo sincronizando operación en ${op.endpoint}:`, errMsg);
+      if (op.id) {
+        await localDB.pendingSync.update(op.id, {
+          error: errMsg,
+          lastAttempt: new Date().toISOString()
+        });
+      }
       break; 
     }
   }
@@ -122,30 +132,57 @@ export async function synchronizeData() {
 
 export async function retryPendingOperation(id: number) {
   const op = await localDB.pendingSync.get(id);
-  if (!op) throw new Error('Operation not found');
+  if (!op) throw new Error('Operación no encontrada');
   
-  const serverResult = await processPendingOperation(op);
-  const table = getTableFromEndpoint(op.endpoint);
-  
-  if (table && op.type !== 'DELETE') {
-    // Si la operación tenía localId, tratamos de actualizar
-    if (op.localId) {
-      await table.update(op.localId as any, { 
-        ...serverResult,
-        _sincronizado: 1 
-      });
+  try {
+    const serverResult = await processPendingOperation(op);
+    const table = getTableFromEndpoint(op.endpoint);
+    
+    if (table && op.type === 'CREATE') {
+      let tempItem: any;
+      if (op.payload?.id) {
+        tempItem = await table.get(op.payload.id);
+      }
+      if (!tempItem) {
+        const tempItems = await table.filter((item: any) => item._sincronizado === 0).toArray();
+        if (tempItems.length > 0) tempItem = tempItems[0];
+      }
+      if (tempItem) {
+        const pkName = table.schema.primKey.name;
+        const tempId = tempItem[pkName];
+        if (serverResult.id && serverResult.id !== tempId) {
+          await table.delete(tempId);
+        }
+        await table.put({
+          ...tempItem,
+          ...serverResult,
+          _sincronizado: 1
+        });
+      }
+    } else if (table && op.type === 'UPDATE') {
+      const pkName = table.schema.primKey.name;
+      const targetId = op.payload?.[pkName] || op.localId;
+      if (targetId) {
+        await table.update(targetId, { _sincronizado: 1 });
+      }
+    } else if (table && op.type === 'DELETE') {
+      if (op.localId) {
+        await table.delete(op.localId as any);
+      }
     }
-  } else if (table && op.type === 'DELETE') {
-    if (op.localId) {
-      await table.delete(op.localId as any);
-    }
+    
+    await localDB.pendingSync.delete(id);
+  } catch (error: any) {
+    const errMsg = error?.message || 'Error desconocido';
+    await localDB.pendingSync.update(id, {
+      error: errMsg,
+      lastAttempt: new Date().toISOString()
+    });
+    throw error;
   }
-  
-  await localDB.pendingSync.delete(id);
 }
 
 export async function discardPendingOperation(id: number) {
-  // Solo eliminamos la operación pendiente, dejamos el registro local tal como está.
   await localDB.pendingSync.delete(id);
 }
 
@@ -189,6 +226,6 @@ export async function downloadAllData() {
       getAlertasPago()
     ]);
   } catch (error) {
-    console.error("Error al descargar datos globales:", error);
+    console.error("Error en sincronización pasiva:", error);
   }
 }

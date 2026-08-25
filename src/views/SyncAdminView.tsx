@@ -141,6 +141,27 @@ export function SyncAdminView() {
                         {JSON.stringify(op.payload, null, 2)}
                       </div>
                     )}
+                    {op.error && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '10px 14px',
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: '6px',
+                        color: '#f87171',
+                        fontSize: '12px',
+                        lineHeight: '1.4',
+                        wordBreak: 'break-word'
+                      }}>
+                        <strong style={{ display: 'block', marginBottom: '2px' }}>⚠️ Detalle del Error:</strong>
+                        <span>{op.error}</span>
+                        {op.lastAttempt && (
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            Último intento: {new Date(op.lastAttempt).toLocaleTimeString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div className="pending-actions">
                       <button className="btn-retry" onClick={() => handleRetry(op.id!)}>Reintentar</button>
                       <button className="btn-discard" onClick={() => handleDiscard(op.id!)}>Descartar Error</button>

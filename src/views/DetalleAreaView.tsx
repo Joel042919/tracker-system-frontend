@@ -741,10 +741,10 @@ export function DetalleAreaView() {
       {/* Modal Configurar Hábito y Mini-tareas */}
       {isHabitoModalOpen && selectedProjForHabito && (
         <div className="modal-overlay" onClick={() => setIsHabitoModalOpen(false)}>
-          <div className="glass-card modal-content" style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="glass-card modal-content" style={{ maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div>
-                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '18px' }}>
                   <CheckSquare style={{ color: 'var(--accent-primary)' }} /> Hábito Diario / Programado
                 </h2>
                 <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0 0' }}>
@@ -754,11 +754,11 @@ export function DetalleAreaView() {
               <button className="action-btn" onClick={() => setIsHabitoModalOpen(false)}><X size={24} /></button>
             </div>
 
-            <form onSubmit={handleSaveHabito} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <form onSubmit={handleSaveHabito} className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', boxSizing: 'border-box' }}>
               {/* Días de la Semana */}
-              <div className="form-group">
+              <div className="form-group" style={{ width: '100%' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>Días de Ejecución *</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(42px, 1fr))', gap: '6px', width: '100%' }}>
                   {[
                     { key: 'lunes', label: 'Lun' },
                     { key: 'martes', label: 'Mar' },
@@ -775,15 +775,16 @@ export function DetalleAreaView() {
                         type="button"
                         onClick={() => toggleDia(d.key)}
                         style={{
-                          flex: '1 1 50px',
-                          padding: '10px 6px',
+                          padding: '10px 4px',
                           borderRadius: '8px',
                           border: active ? '1px solid var(--accent-primary)' : '1px solid rgba(255,255,255,0.1)',
                           background: active ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
                           color: active ? '#fff' : 'var(--text-muted)',
                           fontWeight: active ? 'bold' : 'normal',
+                          fontSize: '13px',
                           cursor: 'pointer',
-                          transition: 'all 0.2s ease'
+                          transition: 'all 0.2s ease',
+                          textAlign: 'center'
                         }}
                       >
                         {d.label}
@@ -794,19 +795,20 @@ export function DetalleAreaView() {
               </div>
 
               {/* Hora y Puntos */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                <div className="form-group">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', width: '100%' }}>
+                <div className="form-group" style={{ width: '100%' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                    <Clock size={14} /> Hora Sugerida (Opcional)
+                    <Clock size={14} /> Hora Sugerida
                   </label>
                   <input
                     type="time"
                     className="form-input"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                     value={horaObjetivo}
                     onChange={e => setHoraObjetivo(e.target.value)}
                   />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ width: '100%' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                     <Flame size={14} style={{ color: '#f59e0b' }} /> Puntos al Completar *
                   </label>
@@ -814,6 +816,7 @@ export function DetalleAreaView() {
                     type="number"
                     min="1"
                     className="form-input"
+                    style={{ width: '100%', boxSizing: 'border-box' }}
                     required
                     value={pointsPorCompletar}
                     onChange={e => setPointsPorCompletar(Number(e.target.value))}
@@ -822,7 +825,7 @@ export function DetalleAreaView() {
               </div>
 
               {/* Mini Tareas / Pasos */}
-              <div className="form-group">
+              <div className="form-group" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, margin: 0 }}>
                     <ListChecks size={16} /> Mini-Tareas / Pasos ({habitoTareas.length})
@@ -830,7 +833,7 @@ export function DetalleAreaView() {
                 </div>
 
                 {/* Lista de tareas existentes */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', width: '100%' }}>
                   {habitoTareas.length === 0 && (
                     <p style={{ color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic', margin: '4px 0' }}>
                       No has agregado mini-tareas aún. Agrega los pasos necesarios para completar este proyecto diariamente.
@@ -846,32 +849,34 @@ export function DetalleAreaView() {
                         background: 'rgba(255, 255, 255, 0.04)',
                         border: '1px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '8px',
-                        padding: '10px 14px',
-                        gap: '12px'
+                        padding: '10px 12px',
+                        gap: '8px',
+                        width: '100%',
+                        boxSizing: 'border-box'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
                         <span style={{ 
-                          width: '24px', height: '24px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', 
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' 
+                          width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', 
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold', flexShrink: 0
                         }}>
                           {idx + 1}
                         </span>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontWeight: 500, color: 'var(--text-main)', wordBreak: 'break-word' }}>{t.nombre}</div>
-                          {t.descripcion && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{t.descripcion}</div>}
+                          <div style={{ fontWeight: 500, color: 'var(--text-main)', wordBreak: 'break-word', fontSize: '13px' }}>{t.nombre}</div>
+                          {t.descripcion && <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t.descripcion}</div>}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>
-                          ⏱️ {t.tiempo_estimado_minutos} min
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <span className="badge" style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', fontSize: '11px', padding: '3px 6px', borderRadius: '6px' }}>
+                          ⏱️ {t.tiempo_estimado_minutos}m
                         </span>
                         <button
                           type="button"
                           className="btn-icon danger"
                           onClick={() => handleRemoveTarea(idx, t.id)}
                           title="Eliminar paso"
-                          style={{ padding: '6px' }}
+                          style={{ padding: '4px' }}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -885,17 +890,20 @@ export function DetalleAreaView() {
                   background: 'rgba(0, 0, 0, 0.2)',
                   border: '1px dashed rgba(255, 255, 255, 0.15)',
                   borderRadius: '10px',
-                  padding: '14px',
+                  padding: '12px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '10px'
+                  gap: '10px',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-primary)' }}>+ Agregar Mini-Tarea</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 110px', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr minmax(80px, 100px)', gap: '8px', width: '100%' }}>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Ej. Read (2) - Write (2)"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
+                      placeholder="Título del paso *"
                       value={newTareaForm.nombre}
                       onChange={e => setNewTareaForm({ ...newTareaForm, nombre: e.target.value })}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTarea(); } }}
@@ -904,16 +912,18 @@ export function DetalleAreaView() {
                       type="number"
                       min="1"
                       className="form-input"
+                      style={{ width: '100%', boxSizing: 'border-box' }}
                       placeholder="Minutos"
                       value={newTareaForm.tiempo_estimado_minutos}
                       onChange={e => setNewTareaForm({ ...newTareaForm, tiempo_estimado_minutos: Number(e.target.value) })}
                     />
                   </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', width: '100%' }}>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="Descripción u objetivo del paso (opcional)"
+                      style={{ flex: '1 1 180px', width: '100%', boxSizing: 'border-box' }}
+                      placeholder="Descripción u objetivo (opcional)"
                       value={newTareaForm.descripcion}
                       onChange={e => setNewTareaForm({ ...newTareaForm, descripcion: e.target.value })}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTarea(); } }}
@@ -922,7 +932,7 @@ export function DetalleAreaView() {
                       type="button"
                       className="btn-primary"
                       onClick={handleAddTarea}
-                      style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: '13px' }}
+                      style={{ whiteSpace: 'nowrap', padding: '8px 14px', fontSize: '13px', flex: '1 1 auto', justifyContent: 'center' }}
                     >
                       <Plus size={15} /> Agregar
                     </button>

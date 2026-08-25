@@ -3,10 +3,10 @@
 /* Botón flotante estilo Glass para abrir el menú */
 .mobile-menu-toggle {
   position: fixed;
-  bottom: 24px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 90;
+  z-index: 999;
   padding: 12px;
   border-radius: 50%;
   display: flex;
@@ -14,8 +14,15 @@
   align-items: center;
   cursor: pointer;
   border: 1px solid var(--glass-border);
-  box-shadow: var(--card-shadow);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.mobile-menu-toggle:hover {
+  transform: translateX(-50%) scale(1.08);
 }
 
 /* Fondo oscuro (overlay) cuando el menú está abierto */
