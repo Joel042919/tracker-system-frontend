@@ -307,19 +307,25 @@ export function DashboardView() {
       const proyecto = proyectos.find(p => p.id === h.id_proyecto);
       const tareas = todasTareas.filter(t => t.id_proyecto_habito === h.id).sort((a, b) => a.orden - b.orden);
       
-      const regHabito = registroHabitos.find(r => r.id_proyecto_habito === h.id && r.fecha === todayStr);
+      const regHabito = registroHabitos.find(r => {
+        if (r.id_proyecto_habito !== h.id) return false;
+        const rFecha = typeof r.fecha === 'string' ? r.fecha.slice(0, 10) : '';
+        return rFecha === todayStr;
+      });
       
       const tareasStatus = tareas.map(t => {
         const regTarea = regHabito 
           ? registroTareas.find(rt => rt.id_registro_habito === regHabito.id && rt.id_proyecto_tarea === t.id)
           : undefined;
-        const completado = regTarea?.completado === 1;
+        const completado = regTarea ? (regTarea.completado === 1 || (regTarea.completado as any) === true) : false;
         return { tarea: t, completado, regTarea };
       });
 
       const totalTareasCount = tareas.length;
       const completadasCount = tareasStatus.filter(ts => ts.completado).length;
-      const completadoHoy = regHabito?.completado === 1 || (totalTareasCount > 0 && completadasCount === totalTareasCount);
+      const completadoHoy = Boolean(
+        regHabito && (regHabito.completado === 1 || (regHabito.completado as any) === true)
+      ) || (totalTareasCount > 0 && completadasCount === totalTareasCount);
 
       return {
         habito: h,
@@ -338,7 +344,11 @@ export function DashboardView() {
   const handleToggleTask = async (habito: ProyectoHabito, tarea: ProyectoTarea, currentDone: boolean) => {
     if (!habito.id || !tarea.id) return;
 
-    let regHab = registroHabitos.find(r => r.id_proyecto_habito === habito.id && r.fecha === todayStr);
+    let regHab = registroHabitos.find(r => {
+      if (r.id_proyecto_habito !== habito.id) return false;
+      const rFecha = typeof r.fecha === 'string' ? r.fecha.slice(0, 10) : '';
+      return rFecha === todayStr;
+    });
     let regHabId = regHab?.id;
 
     if (!regHabId) {
@@ -375,12 +385,14 @@ export function DashboardView() {
 
     const habitTareas = todasTareas.filter(t => t.id_proyecto_habito === habito.id);
     const updatedRTs = await localDB.registro_tareas.filter(rt => rt.id_registro_habito === regHabId).toArray();
-    const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1]));
+    const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1 || (rt.completado as any) === true]));
     doneMap.set(tarea.id, newDone === 1);
 
     const allFinished = habitTareas.length > 0 && habitTareas.every(t => doneMap.get(t.id!) === true);
 
-    if (allFinished && regHab?.completado !== 1) {
+    const regHabCompletado = regHab ? (regHab.completado === 1 || (regHab.completado as any) === true) : false;
+
+    if (allFinished && !regHabCompletado) {
       const newStreak = (habito.record_streak || 0) + 1;
       const newBestStreak = Math.max(habito.best_streak || 0, newStreak);
       const pointsToAward = habito.points_por_completar || 10;
@@ -411,7 +423,7 @@ export function DashboardView() {
       if (pr) {
         await localDB.point_review.put({ id: 1, total_puntos: pr.total_puntos + pointsToAward });
       }
-    } else if (!allFinished && regHab?.completado === 1) {
+    } else if (!allFinished && regHabCompletado) {
       await updateRegistroHabito(regHabId, {
         ...regHab,
         completado: 0,
@@ -814,9 +826,9 @@ export function DashboardView() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {habitosDeHoy.map(({ habito, proyecto, tareas, totalTareasCount, completadasCount, completadoHoy }) => {
+            {habitosDeHoy.map(({ habito, proyecto, tareas, totalTareasCount, completadasCount, regHabito, completadoHoy }) => {
               const isExpanded = !!expandedHabits[habito.id!];
-              const streak = habito.record_streak || 0;
+              const streak = Math.max(habito.record_streak || 0, regHabito?.streak_actual || 0, completadoHoy ? 1 : 0);
 
               return (
                 <div key={habito.id} className={`habit-card ${completadoHoy ? 'completed' : ''}`}>
@@ -838,11 +850,13 @@ export function DashboardView() {
                             {[1, 2, 3, 4, 5].map(dotIdx => (
                               <div
                                 key={dotIdx}
-                                className={`streak-dot ${streak >= dotIdx || (streak > 0 && (streak % 5 >= dotIdx || streak % 5 === 0)) ? 'active' : ''}`}
+                                className={`streak-dot ${streak >= dotIdx ? 'active' : ''}`}
                               />
                             ))}
                           </div>
-                          <span>{streak} day streak</span>
+                          <span style={{ fontWeight: 600, color: streak > 0 ? '#f59e0b' : 'var(--text-muted)' }}>
+                            🔥 {streak} {streak === 1 ? 'día' : 'días'} streak
+                          </span>
                         </div>
                       </div>
                     </div>

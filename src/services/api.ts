@@ -14,14 +14,32 @@ const API_BASE = import.meta.env.VITE_API_URL as string;
 
 /** Conversión de objeto servidor → formato Dexie (boolean → 0/1, fechas → string) */
 function toLocal<T extends Record<string, any>>(server: T, sincronizado: boolean, extra: Partial<T> = {}): T & { _sincronizado: number } {
-  // Copia superficial y convierte campos booleanos comunes: estado, activo, active
+  // Copia superficial y convierte campos booleanos comunes: estado, activo, active, completado, leida
   const local: any = { ...server, ...extra };
-  for (const key of ['estado', 'activo', 'active']) {
-    if (typeof local[key] === 'boolean') local[key] = boolToNum(local[key]);
+  for (const key of ['estado', 'activo', 'active', 'completado', 'leida']) {
+    if (typeof local[key] === 'boolean') {
+      local[key] = boolToNum(local[key]);
+    }
+  }
+  // Normalizar campo fecha (YYYY-MM-DD) si viene con timestamp ISO (ej: 2026-08-25T00:00:00Z -> 2026-08-25)
+  if (local.fecha && typeof local.fecha === 'string') {
+    const match = local.fecha.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) local.fecha = match[1];
+  }
+  if (local.dateTrack && typeof local.dateTrack === 'string') {
+    const match = local.dateTrack.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) local.dateTrack = match[1];
+  }
+  if (local.fecha_inicio && typeof local.fecha_inicio === 'string') {
+    const match = local.fecha_inicio.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) local.fecha_inicio = match[1];
+  }
+  if (local.fecha_fin_planeado && typeof local.fecha_fin_planeado === 'string') {
+    const match = local.fecha_fin_planeado.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) local.fecha_fin_planeado = match[1];
   }
   // Asegurar _sincronizado
   local._sincronizado = sincronizado ? 1 : 0;
-  // Fechas ya vienen como string desde JSON (el backend las serializa como ISO), se mantienen
   return local;
 }
 
@@ -32,6 +50,8 @@ function toServer(local: any): any {
   if ('estado' in server) server.estado = numToBool(server.estado);
   if ('activo' in server) server.activo = numToBool(server.activo);
   if ('active' in server) server.active = numToBool(server.active);
+  if ('completado' in server) server.completado = numToBool(server.completado);
+  if ('leida' in server) server.leida = numToBool(server.leida);
   // Eliminar campos internos
   delete server._sincronizado;
   delete server._ultimaModificacion;
