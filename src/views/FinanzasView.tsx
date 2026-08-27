@@ -12,7 +12,7 @@ import {
 import {
   Wallet, ArrowDownRight, ArrowUpRight, Plus, Trash2, Edit2,
   Calendar, DollarSign, Search, X, CheckCircle2,
-  CreditCard, Banknote, RefreshCw, PieChart, Layers
+  CreditCard, Banknote, RefreshCw, PieChart, Layers, Loader2
 } from 'lucide-react';
 import './FinanzasView.css';
 
@@ -92,6 +92,7 @@ export function FinanzasView() {
   // Modal Movimiento
   const [isMovModalOpen, setIsMovModalOpen] = useState(false);
   const [editingMov, setEditingMov] = useState<Movimiento | null>(null);
+  const [isSavingMov, setIsSavingMov] = useState(false);
   const [movForm, setMovForm] = useState({
     medio_id: '',
     categoria_id: '',
@@ -128,23 +129,31 @@ export function FinanzasView() {
 
   const handleSaveMov = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!movForm.medio_id || Number(movForm.monto) <= 0) return;
+    if (isSavingMov || !movForm.medio_id || Number(movForm.monto) <= 0) return;
 
-    const payload = {
-      medio_id: movForm.medio_id,
-      categoria_id: movForm.categoria_id || null,
-      tipo: movForm.tipo,
-      monto: Number(movForm.monto),
-      fecha_movimiento: new Date(movForm.fecha_movimiento).toISOString(),
-      descripcion: movForm.descripcion || null
-    };
+    setIsSavingMov(true);
+    try {
+      const payload = {
+        medio_id: movForm.medio_id,
+        categoria_id: movForm.categoria_id || null,
+        tipo: movForm.tipo,
+        monto: Number(movForm.monto),
+        fecha_movimiento: new Date(movForm.fecha_movimiento).toISOString(),
+        descripcion: movForm.descripcion || null
+      };
 
-    if (editingMov) {
-      await updateMovimiento(editingMov.id, payload);
-    } else {
-      await createMovimiento(payload);
+      if (editingMov) {
+        await updateMovimiento(editingMov.id, payload);
+      } else {
+        await createMovimiento(payload);
+      }
+      setIsMovModalOpen(false);
+    } catch (err) {
+      console.error('Error guardando movimiento:', err);
+      alert('Hubo un error al guardar el movimiento.');
+    } finally {
+      setIsSavingMov(false);
     }
-    setIsMovModalOpen(false);
   };
 
   // Modal Medio
@@ -1003,8 +1012,19 @@ export function FinanzasView() {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="action-btn" onClick={() => setIsMovModalOpen(false)}>Cancelar</button>
-                <button type="submit" className="btn-primary">Guardar Movimiento</button>
+                <button type="button" className="action-btn" onClick={() => setIsMovModalOpen(false)} disabled={isSavingMov}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary" disabled={isSavingMov} style={{ opacity: isSavingMov ? 0.75 : 1 }}>
+                  {isSavingMov ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" style={{ marginRight: '6px' }} />
+                      Guardando...
+                    </>
+                  ) : (
+                    editingMov ? 'Actualizar Movimiento' : 'Guardar Movimiento'
+                  )}
+                </button>
               </div>
             </form>
           </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDB, type Reward } from '../db/localDb';
 import { getRewards, createReward, updateReward, createPuntosUsados } from '../services/api';
-import { Gift, Plus, Edit2, Trash2, X, CheckCircle, Award } from 'lucide-react';
+import { Gift, Plus, Edit2, Trash2, X, CheckCircle, Award, Loader2 } from 'lucide-react';
 import './PremiosView.css';
 
 export function PremiosView() {
@@ -14,6 +14,7 @@ export function PremiosView() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [reclaimReward, setReclaimReward] = useState<Reward | null>(null);
+  const [isReclaiming, setIsReclaiming] = useState(false);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const initialForm = { reward: '', points_need: 0, description: '' };
   const [formValues, setFormValues] = useState(initialForm);
@@ -70,21 +71,36 @@ export function PremiosView() {
   };
 
   const confirmReclaim = async () => {
-    if (!reclaimReward || !reclaimReward.id) return;
+    if (isReclaiming || !reclaimReward || !reclaimReward.id) return;
+
+    // Validación de seguridad previa
+    const pr = await localDB.point_review.get(1);
+    const availablePoints = pr ? pr.total_puntos : totalPoints;
+    if (availablePoints < reclaimReward.points_need) {
+      alert('No tienes suficientes puntos disponibles para realizar este canje.');
+      setReclaimReward(null);
+      return;
+    }
+
+    setIsReclaiming(true);
     try {
       await createPuntosUsados({
         id_reward: reclaimReward.id,
         reclaim_date: new Date().toISOString()
       });
       // Restar los puntos localmente para reflejo instantáneo en UI
-      const pr = await localDB.point_review.get(1);
       if (pr) {
-        await localDB.point_review.put({ ...pr, total_puntos: pr.total_puntos - reclaimReward.points_need });
+        await localDB.point_review.put({ 
+          ...pr, 
+          total_puntos: Math.max(0, pr.total_puntos - reclaimReward.points_need) 
+        });
       }
       setReclaimReward(null);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error al reclamar premio', e);
-      alert('Hubo un error al reclamar el premio.');
+      alert(e?.message || 'Hubo un error al reclamar el premio.');
+    } finally {
+      setIsReclaiming(false);
     }
   };
 
@@ -155,10 +171,10 @@ export function PremiosView() {
 
       {reclaimReward && (
         <div className="modal-overlay">
-          <div className="modal-content glass-card" style={{ maxWidth: '400px', textAlign: 'center' }}>
+          <div className="modal-content glass-card" style={{ maxWidth: '400px', textAlign: 'center', pointerEvents: isReclaiming ? 'none' : 'auto' }}>
             <h2 style={{ marginBottom: '16px', color: 'var(--text-main)' }}>Confirmar Reclamo</h2>
             <div style={{ margin: '24px 0' }}>
-              <Gift size={48} style={{ color: 'var(--accent)', margin: '0 auto 16px auto' }} />
+              <Gift size={48} style={{ color: 'var(--accent-primary)', margin: '0 auto 16px auto' }} />
               <p style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '8px' }}>
                 ¿Quieres reclamar este premio?
               </p>
@@ -170,11 +186,31 @@ export function PremiosView() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button className="btn-icon" style={{ padding: '10px 24px' }} onClick={() => setReclaimReward(null)}>
+              <button 
+                className="btn-icon" 
+                style={{ padding: '10px 24px', opacity: isReclaiming ? 0.5 : 1 }} 
+                disabled={isReclaiming}
+                onClick={() => setReclaimReward(null)}
+              >
                 Cancelar
               </button>
-              <button className="btn-primary" style={{ padding: '10px 24px' }} onClick={confirmReclaim}>
-                <CheckCircle size={18} style={{ marginRight: '8px' }} /> Confirmar
+              <button 
+                className="btn-primary" 
+                style={{ padding: '10px 24px', opacity: isReclaiming ? 0.75 : 1 }} 
+                disabled={isReclaiming}
+                onClick={confirmReclaim}
+              >
+                {isReclaiming ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" style={{ marginRight: '8px' }} />
+                    Canjeando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle size={18} style={{ marginRight: '8px' }} />
+                    Confirmar
+                  </>
+                )}
               </button>
             </div>
           </div>
