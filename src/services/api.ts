@@ -75,10 +75,28 @@ async function apiFetch(url: string, options?: RequestInit) {
 
 
 async function safeBulkReplace<T>(table: any, serverData: any[], toLocalMapper?: (item: any) => any): Promise<T[]> {
-  const syncedIds = await table.filter((r: any) => r._sincronizado === 1).primaryKeys();
-  await table.bulkDelete(syncedIds);
   const localData = serverData.map((item: any) => toLocalMapper ? toLocalMapper(item) : toLocal(item, true));
-  await table.bulkPut(localData);
+
+  await table.db.transaction('rw', table, async () => {
+    const existing = await table.toArray();
+    const serverIdSet = new Set(localData.map((d: any) => d.id ?? d.idFormulario ?? d.idMacro ?? d.idDayliTrack ?? d.idFoodLog));
+
+    // Solo eliminar los sincronizados que ya no existan en el servidor
+    const toDeleteIds: any[] = [];
+    for (const item of existing) {
+      const id = item.id ?? item.idFormulario ?? item.idMacro ?? item.idDayliTrack ?? item.idFoodLog;
+      if (item._sincronizado === 1 && !serverIdSet.has(id)) {
+        toDeleteIds.push(id);
+      }
+    }
+    if (toDeleteIds.length > 0) {
+      await table.bulkDelete(toDeleteIds);
+    }
+    if (localData.length > 0) {
+      await table.bulkPut(localData);
+    }
+  });
+
   return localData as T[];
 }
 

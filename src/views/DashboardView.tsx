@@ -40,6 +40,8 @@ import {
 import './DashboardView.css';
 
 export function DashboardView() {
+  const [isInitialSyncing, setIsInitialSyncing] = useState(true);
+
   // 1. Total Proyectos
   const totalProyectos = useLiveQuery(() => localDB.proyectos.count(), []) || 0;
   
@@ -47,6 +49,7 @@ export function DashboardView() {
   const totalTareas = useLiveQuery(() => localDB.tasks.count(), []) || 0;
 
   useEffect(() => {
+    let isMounted = true;
     if (navigator.onLine) {
       Promise.all([
         getPointReviewTotal(),
@@ -68,8 +71,17 @@ export function DashboardView() {
         getPresupuestos(),
         getPagosProgramados(),
         getEgresosFijos()
-      ]).catch(console.error);
+      ])
+        .catch(console.error)
+        .finally(() => {
+          if (isMounted) setIsInitialSyncing(false);
+        });
+    } else {
+      setIsInitialSyncing(false);
     }
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const pointReview = useLiveQuery(() => localDB.point_review.get(1), []) || { total_puntos: 0 };
@@ -616,28 +628,41 @@ export function DashboardView() {
 
       {/* ── MÉTRICAS PRINCIPALES ── */}
       <section className="stats-grid">
-        <div className="glass-card stat-card">
-          <span className="stat-number">{totalProyectos}</span>
-          <span className="stat-label">Proyectos Totales</span>
-        </div>
-        <div className="glass-card stat-card">
-          <span className="stat-number">{totalTareas}</span>
-          <span className="stat-label">Tareas Totales</span>
-        </div>
-        <div className="glass-card stat-card">
-          <span className="stat-number" style={{ color: '#10b981' }}>{totalPuntos}</span>
-          <span className="stat-label">Puntos Totales (Disponibles)</span>
-        </div>
-        <div className="glass-card stat-card">
-          <span className="stat-number" style={{ color: '#ef4444' }}>{puntosHoy.totalGastados}</span>
-          <span className="stat-label">Puntos Gastados Hoy</span>
-        </div>
-        <div className="glass-card stat-card">
-          <span className="stat-number" style={{ color: 'var(--accent-primary)' }}>
-            S/ {saldoTotalFinanzas.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </span>
-          <span className="stat-label">Saldo Total en Cuentas</span>
-        </div>
+        {isInitialSyncing && totalProyectos === 0 && totalTareas === 0 ? (
+          <>
+            {[1, 2, 3, 4, 5].map(idx => (
+              <div key={idx} className="glass-card skeleton-stat-card">
+                <div className="skeleton-box" style={{ width: '60px', height: '32px' }} />
+                <div className="skeleton-box" style={{ width: '120px', height: '14px' }} />
+              </div>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="glass-card stat-card">
+              <span className="stat-number">{totalProyectos}</span>
+              <span className="stat-label">Proyectos Totales</span>
+            </div>
+            <div className="glass-card stat-card">
+              <span className="stat-number">{totalTareas}</span>
+              <span className="stat-label">Tareas Totales</span>
+            </div>
+            <div className="glass-card stat-card">
+              <span className="stat-number" style={{ color: '#10b981' }}>{totalPuntos}</span>
+              <span className="stat-label">Puntos Totales (Disponibles)</span>
+            </div>
+            <div className="glass-card stat-card">
+              <span className="stat-number" style={{ color: '#ef4444' }}>{puntosHoy.totalGastados}</span>
+              <span className="stat-label">Puntos Gastados Hoy</span>
+            </div>
+            <div className="glass-card stat-card">
+              <span className="stat-number" style={{ color: 'var(--accent-primary)' }}>
+                S/ {saldoTotalFinanzas.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className="stat-label">Saldo Total en Cuentas</span>
+            </div>
+          </>
+        )}
       </section>
 
       {/* ── SECCIÓN FINANZAS (SALDOS & RESUMEN DE MOVIMIENTOS) ── */}
@@ -652,7 +677,11 @@ export function DashboardView() {
           </div>
 
           <div className="saldos-scroll-container">
-            {medios.length === 0 ? (
+            {isInitialSyncing && medios.length === 0 ? (
+              [1, 2, 3].map(idx => (
+                <div key={idx} className="saldo-card-item skeleton-box" style={{ height: '78px', minWidth: '170px' }} />
+              ))
+            ) : medios.length === 0 ? (
               <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>No hay cuentas registradas aún. Ve a <strong>Finanzas</strong> para agregar cuentas.</p>
             ) : (
               medios.map(m => (
@@ -820,7 +849,19 @@ export function DashboardView() {
           </span>
         </div>
 
-        {habitosDeHoy.length === 0 ? (
+        {isInitialSyncing && habitos.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {[1, 2].map(idx => (
+              <div key={idx} className="skeleton-habit-card">
+                <div className="skeleton-box" style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div className="skeleton-box" style={{ width: '45%', height: '18px' }} />
+                  <div className="skeleton-box" style={{ width: '25%', height: '12px' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : habitosDeHoy.length === 0 ? (
           <div className="glass-card" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <p style={{ margin: 0 }}>No hay hábitos configurados para hoy. Ve a tus <strong>Áreas y Proyectos</strong> para activar hábitos y mini-tareas.</p>
           </div>
