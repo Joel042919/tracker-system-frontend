@@ -38,6 +38,15 @@ function toLocal<T extends Record<string, any>>(server: T, sincronizado: boolean
     const match = local.fecha_fin_planeado.match(/^(\d{4}-\d{2}-\d{2})/);
     if (match) local.fecha_fin_planeado = match[1];
   }
+  // Normalizar due_date (maneja strings ISO y objetos sql.NullTime { Time, Valid })
+  if (local.due_date !== undefined && local.due_date !== null) {
+    if (typeof local.due_date === 'object' && local.due_date.Time !== undefined) {
+      local.due_date = local.due_date.Valid && local.due_date.Time ? String(local.due_date.Time).slice(0, 10) : null;
+    } else if (typeof local.due_date === 'string') {
+      const match = local.due_date.match(/^(\d{4}-\d{2}-\d{2})/);
+      local.due_date = match ? match[1] : (local.due_date.trim() || null);
+    }
+  }
   // Asegurar _sincronizado
   local._sincronizado = sincronizado ? 1 : 0;
   return local;

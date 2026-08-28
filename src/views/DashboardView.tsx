@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDB, type ProyectoHabito, type ProyectoTarea, type PagoProgramado } from '../db/localDb';
 import { SyncIndicator } from '../components/SyncIndicator';
@@ -352,95 +352,108 @@ export function DashboardView() {
     });
   }, [habitos, proyectos, todasTareas, registroHabitos, registroTareas, todayDayName, todayStr]);
 
+  const togglingTasksRef = useRef<Set<number>>(new Set());
+
   // Completar o desmarcar mini-tarea
   const handleToggleTask = async (habito: ProyectoHabito, tarea: ProyectoTarea, currentDone: boolean) => {
     if (!habito.id || !tarea.id) return;
+    if (togglingTasksRef.current.has(tarea.id)) return;
+    togglingTasksRef.current.add(tarea.id);
 
-    let regHab = registroHabitos.find(r => {
-      if (r.id_proyecto_habito !== habito.id) return false;
-      const rFecha = typeof r.fecha === 'string' ? r.fecha.slice(0, 10) : '';
-      return rFecha === todayStr;
-    });
-    let regHabId = regHab?.id;
+    try {
+      let regHab = await localDB.registro_habitos
+        .filter(r => r.id_proyecto_habito === habito.id && (typeof r.fecha === 'string' ? r.fecha.slice(0, 10) : '') === todayStr)
+        .first();
 
-    if (!regHabId) {
-      regHabId = Number(await createRegistroHabito({
-        id_proyecto_habito: habito.id,
-        fecha: todayStr,
-        completado: 0,
-        streak_actual: habito.record_streak || 0,
-        points_ganados: 0,
-        notas: ''
-      }));
-    }
+      let regHabId = regHab?.id;
 
-    if (!regHabId) return;
-
-    const newDone = currentDone ? 0 : 1;
-    const existingRT = registroTareas.find(rt => rt.id_registro_habito === regHabId && rt.id_proyecto_tarea === tarea.id);
-
-    if (existingRT?.id) {
-      await updateRegistroTarea(existingRT.id, {
-        ...existingRT,
-        completado: newDone,
-        fecha_completado: newDone === 1 ? new Date().toISOString() : null
-      });
-    } else {
-      await createRegistroTarea({
-        id_proyecto_tarea: tarea.id,
-        id_registro_habito: regHabId,
-        completado: newDone,
-        fecha_completado: newDone === 1 ? new Date().toISOString() : null,
-        tiempo_real_minutos: tarea.tiempo_estimado_minutos
-      });
-    }
-
-    const habitTareas = todasTareas.filter(t => t.id_proyecto_habito === habito.id);
-    const updatedRTs = await localDB.registro_tareas.filter(rt => rt.id_registro_habito === regHabId).toArray();
-    const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1 || (rt.completado as any) === true]));
-    doneMap.set(tarea.id, newDone === 1);
-
-    const allFinished = habitTareas.length > 0 && habitTareas.every(t => doneMap.get(t.id!) === true);
-
-    const regHabCompletado = regHab ? (regHab.completado === 1 || (regHab.completado as any) === true) : false;
-
-    if (allFinished && !regHabCompletado) {
-      const newStreak = (habito.record_streak || 0) + 1;
-      const newBestStreak = Math.max(habito.best_streak || 0, newStreak);
-      const pointsToAward = habito.points_por_completar || 10;
-
-      await updateRegistroHabito(regHabId, {
-        id_proyecto_habito: habito.id,
-        fecha: todayStr,
-        completado: 1,
-        fecha_completado: new Date().toISOString(),
-        points_ganados: pointsToAward,
-        streak_actual: newStreak
-      });
-
-      await updateProyectoHabito(habito.id, {
-        record_streak: newStreak,
-        best_streak: newBestStreak,
-        ultima_fecha_completada: todayStr
-      });
-
-      await createPuntosGanados({
-        id_registro_habito: regHabId,
-        points: pointsToAward,
-        tipo_origen: 'habito',
-        fecha_registro: new Date().toISOString()
-      });
-
-      const pr = await localDB.point_review.get(1);
-      if (pr) {
-        await localDB.point_review.put({ id: 1, total_puntos: pr.total_puntos + pointsToAward });
+      if (!regHabId) {
+        regHabId = Number(await createRegistroHabito({
+          id_proyecto_habito: habito.id,
+          fecha: todayStr,
+          completado: 0,
+          streak_actual: habito.record_streak || 0,
+          points_ganados: 0,
+          notas: ''
+        }));
       }
-    } else if (!allFinished && regHabCompletado) {
-      await updateRegistroHabito(regHabId, {
-        ...regHab,
-        completado: 0,
-        fecha_completado: null
-      });
+
+      if (!regHabId) return;
+
+      const newDone = currentDone ? 0 : 1;
+      const existingRT = await localDB.registro_tareas
+        .filter(rt => rt.id_registro_habito === regHabId && rt.id_proyecto_tarea === tarea.id)
+        .first();
+
+      if (existingRT?.id) {
+        await updateRegistroTarea(existingRT.id, {
+          ...existingRT,
+          completado: newDone,
+          fecha_completado: newDone === 1 ? new Date().toISOString() : null
+        });
+      } else {
+        await createRegistroTarea({
+          id_proyecto_tarea: tarea.id,
+          id_registro_habito: regHabId,
+          completado: newDone,
+          fecha_completado: newDone === 1 ? new Date().toISOString() : null,
+          tiempo_real_minutos: tarea.tiempo_estimado_minutos
+        });
+      }
+
+      const habitTareas = await localDB.proyecto_tareas.filter(t => t.id_proyecto_habito === habito.id && t.activo === 1).toArray();
+      const updatedRTs = await localDB.registro_tareas.filter(rt => rt.id_registro_habito === regHabId).toArray();
+      const doneMap = new Map(updatedRTs.map(rt => [rt.id_proyecto_tarea, rt.completado === 1 || (rt.completado as any) === true]));
+      doneMap.set(tarea.id, newDone === 1);
+
+      const allFinished = habitTareas.length > 0 && habitTareas.every(t => doneMap.get(t.id!) === true);
+
+      // Consultar el estado fresco del registro_habito y puntos en Dexie
+      const freshRegHab = await localDB.registro_habitos.get(regHabId);
+      const isAlreadyCompleted = freshRegHab ? (freshRegHab.completado === 1 || (freshRegHab.completado as any) === true) : false;
+      const existingPG = await localDB.puntos_ganados.filter(p => p.id_registro_habito === regHabId).first();
+
+      if (allFinished && !isAlreadyCompleted && !existingPG) {
+        const newStreak = (habito.record_streak || 0) + 1;
+        const newBestStreak = Math.max(habito.best_streak || 0, newStreak);
+        const pointsToAward = habito.points_por_completar || 10;
+
+        await updateRegistroHabito(regHabId, {
+          id_proyecto_habito: habito.id,
+          fecha: todayStr,
+          completado: 1,
+          fecha_completado: new Date().toISOString(),
+          points_ganados: pointsToAward,
+          streak_actual: newStreak
+        });
+
+        await updateProyectoHabito(habito.id, {
+          record_streak: newStreak,
+          best_streak: newBestStreak,
+          ultima_fecha_completada: todayStr
+        });
+
+        await createPuntosGanados({
+          id_registro_habito: regHabId,
+          points: pointsToAward,
+          tipo_origen: 'habito',
+          fecha_registro: new Date().toISOString()
+        });
+
+        const pr = await localDB.point_review.get(1);
+        if (pr) {
+          await localDB.point_review.put({ id: 1, total_puntos: pr.total_puntos + pointsToAward });
+        }
+      } else if (!allFinished && isAlreadyCompleted) {
+        await updateRegistroHabito(regHabId, {
+          ...(freshRegHab || regHab),
+          completado: 0,
+          fecha_completado: null,
+          points_ganados: 0
+        });
+      }
+    } finally {
+      togglingTasksRef.current.delete(tarea.id);
     }
   };
 

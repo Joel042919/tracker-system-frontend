@@ -182,9 +182,11 @@
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   padding-bottom: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-/* Las columnas ocupan casi toda la pantalla en móvil */
+/* Las columnas ocupan la pantalla en móvil */
 .kanban-column {
   display: flex;
   flex-direction: column;
@@ -192,11 +194,18 @@
   background: rgba(128, 128, 128, 0.05);
   border-radius: 20px;
   padding: 14px;
-  min-width: 85vw; 
+  width: 85vw;
+  max-width: 88vw;
+  min-width: 0;
   flex-shrink: 0;
   scroll-snap-align: center;
   transition: background 0.3s ease;
   box-sizing: border-box;
+}
+
+.kanban-board.single-column .kanban-column {
+  width: 100%;
+  max-width: 100%;
 }
 
 .kanban-column.drag-over {
@@ -212,6 +221,8 @@
     gap: 20px;
   }
   .kanban-column {
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     padding: 16px;
     border-radius: 24px;
@@ -238,6 +249,12 @@
   gap: 10px;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   border-radius: 14px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .kanban-card:active {
@@ -254,14 +271,32 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+  width: 100%;
 }
 
 .kanban-card-title {
   margin: 0;
   font-size: 15px;
   color: var(--text-main);
-  font-weight: 500;
+  font-weight: 600;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  flex: 1;
+}
+
+.kanban-card-desc {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .card-actions {

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { localDB, type Task } from '../db/localDb';
-import { createTask, updateTask, deleteTask, createPuntosGanados, deletePuntosGanados } from '../services/api';
+import { getTasks, createTask, updateTask, deleteTask, createPuntosGanados, deletePuntosGanados } from '../services/api';
 import { Clock, CheckCircle2, Circle, Trash2, Calendar, Edit2, X } from 'lucide-react';
 import './TareasView.css';
 
@@ -12,6 +12,11 @@ const COLUMNS = [
 ];
 
 export function TareasView() {
+  // Cargar tareas del servidor al montar
+  useEffect(() => {
+    getTasks().catch(console.error);
+  }, []);
+
   // Estado para el formulario de Creación
   const [taskname, setTaskname] = useState('');
   const [description, setDescription] = useState('');
@@ -58,7 +63,15 @@ export function TareasView() {
   };
 
   const handleEditClick = (task: Task) => {
-    setEditingTask(task);
+    let rawDue: any = task.due_date;
+    if (typeof rawDue === 'object' && rawDue !== null && rawDue.Time !== undefined) {
+      rawDue = rawDue.Valid ? rawDue.Time : '';
+    }
+    if (typeof rawDue === 'string') {
+      const match = rawDue.match(/^(\d{4}-\d{2}-\d{2})/);
+      rawDue = match ? match[1] : rawDue;
+    }
+    setEditingTask({ ...task, due_date: rawDue || '' });
   };
 
   const handleStatusChangeLogic = async (task: Task, newStatus: string) => {
@@ -233,7 +246,7 @@ export function TareasView() {
       </div>
 
       {/* ─── TABLERO KANBAN ─── */}
-      <div className="kanban-board">
+      <div className={`kanban-board ${mobileTab !== 'all' ? 'single-column' : ''}`}>
         {COLUMNS.filter(c => mobileTab === 'all' || mobileTab === c.id).map(column => {
           const columnTasks = tasks.filter(t => t.status === column.id);
           const Icon = column.icon;
@@ -274,7 +287,7 @@ export function TareasView() {
                   </div>
                   
                   {task.description && (
-                    <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>
+                    <p className="kanban-card-desc">
                       {task.description}
                     </p>
                   )}
@@ -314,26 +327,34 @@ export function TareasView() {
                   </div>
 
                   <div className="kanban-card-footer">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <Calendar size={14} />
-                      {(() => {
-                        const rawDate = task.due_date || task.created_at;
-                        if (!rawDate) return 'Sin fecha';
-                        const str = String(rawDate).trim();
-                        const match = str.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-                        if (match) {
-                          const isDue = Boolean(task.due_date);
-                          const dateFormatted = `${match[3].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[1]}`;
-                          return isDue ? `Vence: ${dateFormatted}` : dateFormatted;
-                        }
-                        const d = new Date(rawDate);
-                        if (!isNaN(d.getTime())) {
-                          const dateFormatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                          return task.due_date ? `Vence: ${dateFormatted}` : dateFormatted;
-                        }
-                        return 'Sin fecha';
-                      })()}
-                    </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <Calendar size={14} />
+                        {(() => {
+                          let rawDate: any = task.due_date;
+                          let isDue = true;
+                          if (typeof rawDate === 'object' && rawDate !== null && rawDate.Time !== undefined) {
+                            rawDate = rawDate.Valid ? rawDate.Time : null;
+                          }
+                          if (!rawDate) {
+                            rawDate = task.created_at;
+                            isDue = false;
+                          }
+                          if (!rawDate) return 'Sin fecha';
+
+                          const str = String(rawDate).trim();
+                          const match = str.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+                          if (match) {
+                            const dateFormatted = `${match[3].padStart(2, '0')}/${match[2].padStart(2, '0')}/${match[1]}`;
+                            return isDue ? `Vence: ${dateFormatted}` : dateFormatted;
+                          }
+                          const d = new Date(rawDate);
+                          if (!isNaN(d.getTime())) {
+                            const dateFormatted = d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                            return isDue ? `Vence: ${dateFormatted}` : dateFormatted;
+                          }
+                          return 'Sin fecha';
+                        })()}
+                      </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="badge-points">{task.points} pts</span>
                       <span title={task._sincronizado === 1 ? 'Sincronizado' : 'Pendiente subir'}>
